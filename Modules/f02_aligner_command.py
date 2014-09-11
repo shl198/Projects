@@ -106,7 +106,7 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
     """
     map_result = []
     bwaCmd = ''
-    for fastq in fqFiles:
+    for fastq,rg in zip(fqFiles,readgroup):
         if fastq[0].endswith(".fastq.gz"):
             output = fastq[0][:-8] + 'sam'
         else:
@@ -115,12 +115,12 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
         if len(fastq) == 2:
             bwaCmd = bwaCmd + ('bwa mem -t {thread} -M -R {readgroup} '
                       '{database} {fq1} {fq2} > {output} & ').format(
-                        thread=thread,readgroup=readgroup,database=database,
+                        thread=thread,readgroup=rg,database=database,
                         fq1=fastq[0],fq2=fastq[1],output=output)
         else:
             bwaCmd = bwaCmd + ('bwa mem -t {thread} -M -R {readgroup} '
                        '{database} {fq} > {output} & ').format(thread=thread,
-                        readgroup=readgroup,database=database,fq=fastq[0])
+                        readgroup=rg,database=database,fq=fastq[0])
     subprocess.call(bwaCmd[:-2],shell=True)
             
 #============  STAR alignment  ===============================
@@ -157,5 +157,5 @@ def STAR(fastqFiles,db_path,thread=1):
     for sam in map_result:
         rename = ('mv {star_result} {modified_name}').format(star_result=sam,
                   modified_name=sam[:-15] + 'sam')
-        final_name.append(renam)
+        final_name.append(rename)
     return final_name
