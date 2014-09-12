@@ -26,14 +26,15 @@ def markduplicates(sortbam):
     """
     mark = picard + '/' + 'MarkDuplicates.jar'
     dedup_files = []
+    cmd = ''
     for bam in sortbam:
         dedup = bam[:-8] + 'dedup.bam'
         dedup_files.append(dedup)
-        cmd = ('java -jar {mark} I={input} O={output} CREATE_INDEX=true '
+        cmd = cmd + ('java -jar {mark} I={input} O={output} CREATE_INDEX=true '
         'METRICS_FILE=metrics.txt MAX_RECORDS_IN_RAM=2000000 '
-        'MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000').format(mark=mark,input=bam,
+        'MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 & ').format(mark=mark,input=bam,
         output=dedup)
-        subprocess.call(cmd,shell=True)
+    subprocess.call(cmd[:-2],shell=True)
     return dedup_files
 
 
