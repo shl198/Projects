@@ -28,6 +28,7 @@ def remove_duplicate(outputfile,inputfile):
             SeqIO.write(item,output,'fasta')
     output.close()
 
-inputfile = '/home/shangzhong/Database/bacteria_fungi/bacteria_fungi.fa'
-outputfile = '/home/shangzhong/Database/bacteria_fungi/new_bacteria_fungi.fa'
-remove_duplicate(outputfile,inputfile)
+inputfile = '/opt/genome/hamster/cgr_alt_C_griseus_v1.0_chrUn.fa'
+outputfile = '/opt/genome/hamster/hamster.fa'
+inter = '/opt/genome/hamster/inter.fa'
+change_name(outputfile,inputfile,inter)
