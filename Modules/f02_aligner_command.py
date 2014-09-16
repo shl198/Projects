@@ -61,7 +61,7 @@ def bowtie2(fastqFiles,database,thread=1):
                          '-S {outputfile} & ').format(database=database,
                         thread = thread, fastq = fastq[0], outputfile=output)
     subprocess.call(cmd[:-2],shell=True)
-
+    return map_result
 #============  Tophat Alignment  =======================            
 def tophat(fastqFiles,database,annotation,thread=1):
     """
@@ -92,13 +92,16 @@ def blastn(faFiles,database,thread = 1):
     """
     this function run blastn,default model is running through internet 
     """
+    map_result = []
     for fa in faFiles:
         output = fa[:-2] + 'blast.txt'
+        map_result.append(output)
         blastn = ('blastn -query {input} -task megablast -out {output} '
                   '-db {db} -evalue 1e-10 -word_size 10 -outfmt 6 '
                   '-num_alignments 1 -num_threads {thread} ').format(
                   input=fa,output=output,db=database,thread=thread)
         subprocess.call(blastn,shell=True)
+    return map_result
 #============ bwa alignment  ===============================
 def bwa_vari(readgroup,fqFiles,database,thread=1):
     """
@@ -122,7 +125,7 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
                        '{database} {fq} > {output} & ').format(thread=thread,
                         readgroup=rg,database=database,fq=fastq[0])
     subprocess.call(bwaCmd[:-2],shell=True)
-            
+    return map_result        
 #============  STAR alignment  ===============================
 def STAR(fastqFiles,db_path,thread=1):
     """
