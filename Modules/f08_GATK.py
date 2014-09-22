@@ -7,13 +7,14 @@ def RealignerTargetCreator(dedupbams,reference):
     fasta file.
     """
     interval_files = []
+    cmd = ''
     for dedupbam in dedupbams:  #file name is name.dedup.bam
         interval = dedupbam[:-9] + 'interval.list'
         interval_files.append(interval)
-        cmd = ('java -Xmx8G -jar {gatk} -T RealignerTargetCreator '
-               '-R {ref_fa} -I {dedup} -o {output}').format(
+        cmd = cmd + ('java -jar {gatk} -T RealignerTargetCreator '
+               '-R {ref_fa} -I {dedup} -o {output} & ').format(
                 gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval)
-        subprocess.call(cmd,shell=True)
+    subprocess.call(cmd[:-2],shell=True)
     return interval_files
 
 def IndelRealigner(dedupbams,reference,intervals):
@@ -22,14 +23,15 @@ def IndelRealigner(dedupbams,reference,intervals):
     reference is fasta file, target is target interval file.
     """
     realigned_files = []
+    cmd = ''
     for dedupbam,interval in zip(dedupbams,intervals):
-        realign = dedupbam[:-9] + 'realign.bam'
+        realign = dedupbam[:-9] + 'reali.bam'
         realigned_files.append(realign)
-        cmd = ('java -jar {gatk} -T IndelRealigner -R {ref_fa} '
+        cmd = cmd + ('java -jar {gatk} -T IndelRealigner -R {ref_fa} '
                '-I {input} -targetIntervals {target} '
-               '-o {output}').format(gatk=gatk,ref_fa=reference,
+               '-o {output} & ').format(gatk=gatk,ref_fa=reference,
                 input=dedupbam,target=interval,output=realign)
-        subprocess.call(cmd,shell=True)
+    subprocess.call(cmd[:-2],shell=True)
     return realigned_files
 
 def HaplotypeCaller_DNA_VCF(recal_files,reference,thread):
@@ -38,11 +40,11 @@ def HaplotypeCaller_DNA_VCF(recal_files,reference,thread):
     """
     vcf_files = []
     for recal in recal_files:
-        vcf = recal[:-11] + 'raw.vcf'
+        vcf = recal[:-9] + 'raw.vcf'
         vcf_files.append(vcf)
         cmd = ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
                '-I {input} -nct {thread} --genotyping_mode DISCOVERY -stand_emit_conf 15 ' 
-               '-stand_call_conf 30 -o {output}').format(gatk=gatk,
+               '-stand_call_conf 30 -o {output} -L NW_006880538.1').format(gatk=gatk,
                 ref_fa=reference,input=recal,output=vcf,thread=thread)
         subprocess.call(cmd,shell=True)
     return vcf_files
@@ -84,7 +86,7 @@ def SelectVariants(joint_variant,reference,extract_type):
     this function can extract either SNP or indel from the
     vcf file
     """
-    output = joint_variant[:-5] + extract_type.lower() + '.vcf'
+    output = joint_variant[:-5] + extract_type.lower() + '.vcf'  # sample.raw.snp.vcf
     cmd = ('java -jar {gatk} -T SelectVariants -R {ref_fa} -V {input} '
            '-selectType {type} -o {output}').format(gatk=gatk, 
             ref_fa=reference,input=joint_variant,type=extract_type,
@@ -133,7 +135,7 @@ def HardFilter(raw_gvcf,reference):
     gold_indel = indelHardFilter(raw_indel,reference)
     return [gold_snp,gold_indel]
 
-def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel):
+def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel,roundNum):
     """
     this function do base recalibration
     """
@@ -141,7 +143,7 @@ def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel):
     cmd = ''
     recal_tables = []
     for realign in realignbams:
-        table = realign[:-11] + 'recal.table'
+        table = realign[:-9] + 'recal.table'
         recal_tables.append(table)
         cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
            '-I {realignbam} -knownSites {snp} -knownSites {indel} '
@@ -153,7 +155,7 @@ def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel):
     cmd = ''
     recal_post_tables = []
     for realign,table in zip(realignbams,recal_tables):
-        post_table = realign[:-11] + 'post_recal.table'
+        post_table = realign[:-9] + 'post_recal.table'
         recal_post_tables.append(post_table)
         cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
            '-I {realignbam} -knownSites {snp} -knownSites {indel} -BQSR {table} '
@@ -164,7 +166,7 @@ def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel):
     # 3. Generate before/after plots
     cmd = ''
     for table,post_table in zip(recal_tables,recal_post_tables):
-        plot = table[:-11] + 'recal_plots.pdf'
+        plot = table[:-11] + str(roundNum) + 'recal_plots.pdf'
         cmd = cmd + ('java -jar {gatk} -T AnalyzeCovariates -R {ref_fa} '
                      '-before {table} -after {post_table} -plots {output} & ').format(
                     gatk=gatk,ref_fa=reference,table=table,post_table=post_table,
@@ -175,7 +177,7 @@ def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel):
     cmd = ''
     recal_bams = []
     for realign,table in zip(realignbams,recal_tables):
-        recal_bam = realign[:-11] + 'recal.bam'
+        recal_bam = realign[:-9] + 'recal.bam'
         recal_bams.append(recal_bam)
         cmd = cmd + ('java -jar {gatk} -T PrintReads -R {ref_fa} '
         '-I {input} -BQSR {table} -o {output} & ').format(gatk=gatk,
@@ -196,7 +198,7 @@ def VQSR(raw_gvcf,gold_snp,gold_indel,reference):
            '-resource:dbsnp,known=false,training=true,truth=true,prior=10.0 '
            '{gold} -an DP -an QD -an FS -an MQRankSum -an ReadPosRankSum '
            '-mode SNP -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 '
-           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot}').format(
+           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot} -nt 5').format(
             gatk=gatk,ref_fa=reference,input=raw_gvcf,gold=gold_snp,
             recal=recal_snp,tranch=tranch_snp,rplot=rplot_snp)
     subprocess.call(cmd,shell=True)

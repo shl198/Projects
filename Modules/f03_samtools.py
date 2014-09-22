@@ -1,5 +1,5 @@
 import subprocess
-def sam2bam_sort(samfiles):
+def sam2bam_sort(samfiles,thread=1):
     """
     This function will change sam file to bam file and sort bam files
     """
@@ -15,21 +15,24 @@ def sam2bam_sort(samfiles):
         sort_bam = sort + '.bam'
         sorted_files.append(sort_bam)
         # sam file to bam file
-        sam2bamCmd = sam2bamCmd + 'samtools view -bS {sam} > {bam} & '.format(sam=sam, bam=bam)
+        sam2bamCmd = sam2bamCmd + ('samtools view -@ {thread} -bS {sam} '
+                                   '-o {bam} & ').format(sam=sam, bam=bam,thread=thread)
         # remove sam file
         rmSamCmd = rmSamCmd + 'rm {sam} & '.format(sam=sam)
         # sort bam file
-        sortBamCmd = sortBamCmd + 'samtools sort {bam} {bamsort} & '.format(bam=bam,bamsort=sort)
+        sortBamCmd = sortBamCmd + ('samtools sort -m 4G -@ {thread} -T {sort} {bam} '
+                                   '-o {sortbam} & ').format(thread=thread,sort=sort,
+                                    bam=bam,sortbam=sort_bam)
         # index bam file
         indexCmd = indexCmd + 'samtools index {sortbam} & '.format(sortbam=sort_bam)
         # remove unsorted bam file
         rmBamCmd = rmBamCmd + 'rm {bam} & '.format(bam=bam)
         
-    subprocess.call(sam2bamCmd[:-2],shell=True)    
-    subprocess.call(rmSamCmd[:-2],shell=True)
-    subprocess.call(sortBamCmd[:-2],shell=True)
-    subprocess.call(indexCmd[:-2],shell=True)
-    subprocess.call(rmBamCmd[:-2],shell=True)
+    subprocess.call(sam2bamCmd[:-3],shell=True)    
+    subprocess.call(rmSamCmd[:-3],shell=True)
+    subprocess.call(sortBamCmd[:-3],shell=True)
+    subprocess.call(indexCmd[:-3],shell=True)
+    subprocess.call(rmBamCmd[:-3],shell=True)
     return sorted_files
  
 def bam2sam(bamfiles):
@@ -43,7 +46,7 @@ def bam2sam(bamfiles):
         samFiles.append(samfile)
         # command
         cmd = cmd + 'samtools view {bam} > {sam} & '.format(bam=bam,sam=samfile)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     
     return samFiles
 #===========================================================================
@@ -61,6 +64,6 @@ def extract_mapped(map_result):
         filename = mapfile[:-9] + '.mapped.sort.bam'
         returnFile.append(filename)
         cmd = cmd + 'samtools view -F 4 -bh {input} > {output} & '.format(input=mapfile,output=filename)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     
     return returnFile

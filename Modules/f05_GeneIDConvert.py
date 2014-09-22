@@ -22,4 +22,5 @@ def ID_Convert(Dict,output_path,inputpath):
                 output.write('\t'.join(item))
             except:
                 output.write('\t'.join(item))
+        result.close()
         output.close()

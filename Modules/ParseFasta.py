@@ -1,7 +1,8 @@
 from Bio import SeqIO
 import os 
 def change_name(outputfile,inputfile,inter):
-    #this function can change the reference name of fasta file to accession number     
+    """this function can change the reference name of fasta file to accession number
+    """     
     reference = SeqIO.parse(open(inputfile,'rU'),'fasta')
     output = open(inter,'w')
     for item in reference:
