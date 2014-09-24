@@ -1,4 +1,5 @@
 import subprocess
+from f03_samtools import merge_bam
 def remove(files):
     """
     this function can remove files provided
@@ -34,4 +35,26 @@ def get_parameters(parFile):
     if isinstance(dic['readGroup'],str):
                 dic['readGroup'] = [dic['readGroup'][:-1]]
     return dic
+
+def rg_bams(rgs,bamfiles):
+    """
+    this function merge bam files by read group names
+    bam files belong to same sample will be merged into one bam file
+    """
+    readic = {}
+    # build a dic, key is sample name, value is bam file
+    for rg,bam in zip(rgs,bamfiles):
+        start = rg.index('SM:')
+        end = rg.index('PL:')
+        sample = rg[start+3:end-3]
+        if sample in readic:
+            readic[sample].append(bam)
+        else:
+            readic[sample] = [bam]
+    merged = []
+    for sample in readic:
+        output = sample + '.bam'
+        merged.append(output)
+        merge_bam(readic[sample],output)
+    return merged
 

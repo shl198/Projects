@@ -44,7 +44,7 @@ def HaplotypeCaller_DNA_VCF(recal_files,reference,thread):
         vcf_files.append(vcf)
         cmd = ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
                '-I {input} -nct {thread} --genotyping_mode DISCOVERY -stand_emit_conf 15 ' 
-               '-stand_call_conf 30 -o {output} -L NW_006880538.1').format(gatk=gatk,
+               '-stand_call_conf 30 -o {output}').format(gatk=gatk,
                 ref_fa=reference,input=recal,output=vcf,thread=thread)
         subprocess.call(cmd,shell=True)
     return vcf_files

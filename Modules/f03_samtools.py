@@ -67,3 +67,11 @@ def extract_mapped(map_result):
     subprocess.call(cmd[:-3],shell=True)
     
     return returnFile
+
+def merge_bam(bamfiles,outputbam):
+    """
+    this function merges bam files into one
+    """
+    bam = ' '.join(bamfiles)
+    cmd = ('samtools merge -f {output} {input}').format(output=outputbam,input=bam)
+    subprocess.call(cmd,shell=True)

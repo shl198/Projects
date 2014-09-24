@@ -39,7 +39,7 @@ def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
                             '-N 1 -s {annotation} {fastq} > {output} & ').format(db_path=db_path
                             ,db_name=db_name,thread=thread,annotation=annotation,
                             fastq=fastq[0],output=output)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return map_result
 
 #=========  bowtie2 alignment  ========================= 
@@ -60,7 +60,7 @@ def bowtie2(fastqFiles,database,thread=1):
             cmd = cmd + ('bowtie2 -x {database} -p {thread} -U {fastq} '
                          '-S {outputfile} & ').format(database=database,
                         thread = thread, fastq = fastq[0], outputfile=output)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return map_result
 #============  Tophat Alignment  =======================            
 def tophat(fastqFiles,database,annotation,thread=1):
@@ -84,7 +84,7 @@ def tophat(fastqFiles,database,annotation,thread=1):
             cmd = cmd + ('tophat -p {thread} -G {gff} --b2-very-sensitive -o {output} '
             '{reference} {fastq} & ').format(thread = thread, gff = annotation, 
             output = output,reference = database, fastq = fastq[0])
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return map_result
 
 #============  Blast Alignment  ===========================
@@ -117,14 +117,14 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
         map_result.append(output)
         if len(fastq) == 2:
             bwaCmd = bwaCmd + ('bwa mem -t {thread} -M -R {readgroup} '
-                      '{database} {fq1} {fq2} > {output} & ').format(
+                      '{database} {fq1} {fq2} > {output} && ').format(
                         thread=thread,readgroup=rg,database=database,
                         fq1=fastq[0],fq2=fastq[1],output=output)
         else:
             bwaCmd = bwaCmd + ('bwa mem -t {thread} -M -R {readgroup} '
-                       '{database} {fq} > {output} & ').format(thread=thread,
+                       '{database} {fq} > {output} && ').format(thread=thread,
                         readgroup=rg,database=database,fq=fastq[0])
-    subprocess.call(bwaCmd[:-2],shell=True)
+    subprocess.call(bwaCmd[:-3],shell=True)
     return map_result        
 #============  STAR alignment  ===============================
 def STAR(fastqFiles,db_path,thread=1):
@@ -155,7 +155,7 @@ def STAR(fastqFiles,db_path,thread=1):
                          '{thread} --outFileNamePrefix {output} & ').format(
                         ref=db_path,fastq1=fastq[0],
                         thread=thread,output=output)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     final_name = []
     for sam in map_result:
         rename = ('mv {star_result} {modified_name}').format(star_result=sam,
