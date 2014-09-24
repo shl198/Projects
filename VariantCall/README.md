@@ -1,7 +1,10 @@
 Before running the pipeline:
 ============================
-1. change file_path, Trim, bwaDb, ref_fa, samplename, read_group,
-   -L option in RealignerTarget Creater, HaplotypeCaller,BaseRecalibrator
+
+should only change the parameters in block define some parameters:
+------------------------------------------------------------------
+1. change file_path, Trim, bwaDb, ref_fa, samplename, read_group
+2. In file Modules/f08_GATK.py: change -L option in RealignerTarget Creater, HaplotypeCaller,BaseRecalibrator.
 
 Run pipeline:
 =============
@@ -60,12 +63,16 @@ Part II:
 -----------------------
 
 ### 1) Select Variants:
-	* sample.snp.vcf
-	* sample.indel.vcf
+	* samplename.raw.snp.vcf
+	* samplename.raw.snp.vcf.idx
+	* samplename.raw.indel.vcf
+	* samplename.raw.indel.vcf.idx
 ### 2) snp hard filter:
-	* sample.gold.snp.vcf
+	* samplename.gold.snp.vcf
+	* samplename.gold.snp.vcf.idx
 ### 3) indel hard filter:
-	* sample.gold.indel.vcf
+	* samplename.gold.indel.vcf
+	* samplename.gold.indel.vcf.idx
 
 5. Base recalibration:
 ----------------------

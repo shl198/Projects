@@ -1,0 +1,25 @@
+"""
+thread = '5'
+email = 'shl198@eng.ucsd.edu'
+"""
+file_path = '/data/shangzhong/VariantCall/pgsa_CH' 
+bwaDb = '/opt/genome/hamster/bwa_hamsterDb/bwahamster'
+ref_fa = '/opt/genome/hamster/hamster.fa'
+samplename = 'CHOS'
+"""
+file_path = '/data/ResequencedLines/2014_06_CHOS_CHOZ/CHOS' 
+bwaDb = '/opt/genome/cho/bwa_chok1Db/bwachok1'
+ref_fa = '/opt/genome/cho/cgr_ref_CriGri_1.0_chrUn.fa'
+samplename = 'CHOS'
+
+# file_path = sys.argv[1]
+# bwaDb = sys.argv[2]
+# ref_fa = sys.argv[3]
+# samplename = sys.argv[4]
+
+read_group = ["""'@RG\\tID:CHOS1CHO\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1'""",
+              """'@RG\\tID:CHOS2CHO\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1'""",
+              """'@RG\\tID:CHOS3CHO\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1'""",
+              """'@RG\\tID:CHOS4CHO\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1'""",
+              """'@RG\\tID:CHOS5CHO\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1'""",
+              """'@RG\\tID:CHOS6CHO\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1'"""]

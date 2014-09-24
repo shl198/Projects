@@ -1,0 +1,82 @@
+# This file includes all parameters that need to be set for all pipelines.
+
+##===============  global parameters ================================
+thread	15
+	# number of threads
+
+
+email	shl198@eng.ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	hamsterVShamster start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	hamsterVShamster end
+	# message which will be sent to email when pipeline finishes
+
+
+refSequence	/opt/genome/hamster/hamster.fa
+	# fasta file of target organism
+
+
+filePath	/data/shangzhong/VariantCall/hamster
+	# folder where fastq files locate
+
+
+alignerDb	/opt/genome/hamster/bwa_hamsterDb/bwahamster
+	# index of refSequence for aligner to be used
+
+
+trim	True
+	# choose whether to trim the origional fastq files
+
+
+phred	64
+	# encoding score for raw data.
+	# other option: 64
+
+
+##================ parameters for specific pipeline ==================
+#----------------- GATK pipeline -------------------------------------
+readGroup	@RG\\tID:CHI232L7\\tSM:I232\\tPL:illumina\\tLB:lib20000\\tPU:unit1,@RG\\tID:CHI246L5\\tSM:I246\\tPL:illumina\\tLB:lib2000\\tPU:unit1,@RG\\tID:CHI246L6\\tSM:I246\\tPL:illumina\\tLB:lib2000\\tPU:unit1,@RG\\tID:CHI263L3\\tSM:I263\\tPL:illumina\\tLB:lib10000\\tPU:unit1,@RG\\tID:CHI263L6\\tSM:I263\\tPL:illumina\\tLB:lib10000\\tPU:unit1,@RG\\tID:CHI263L7\\tSM:I263\\tPL:illumina\\tLB:lib10000\\tPU:unit1,@RG\\tID:CHI263L8\\tSM:I263\\tPL:illumina\\tLB:lib10000\\tPU:unit1,@RG\\tID:CHI269L5\\tSM:I269\\tPL:illumina\\tLB:lib5000\\tPU:unit1,@RG\\tID:CHI433L6\\tSM:I433\\tPL:illumina\\tLB:lib500\\tPU:unit1,@RG\\tID:CHI433L7\\tSM:I433\\tPL:illumina\\tLB:lib500\\tPU:unit1,@RG\\tID:CHI433L8\\tSM:I433\\tPL:illumina\\tLB:lib500\\tPU:unit1,@RG\\tID:CHI631L1\\tSM:I631\\tPL:illumina\\tLB:lib500\\tPU:unit1,@RG\\tID:CHI631L2\\tSM:I631\\tPL:illumina\\tLB:lib500\\tPU:unit1,@RG\\tID:CHI631L3\\tSM:I631\\tPL:illumina\\tLB:lib500\\tPU:unit1,@RG\\tID:CHI666L1\\tSM:I666\\tPL:illumina\\tLB:lib180\\tPU:unit1,@RG\\tID:CHI666L2\\tSM:I666\\tPL:illumina\\tLB:lib180\\tPU:unit1,@RG\\tID:CHI666L6\\tSM:I666\\tPL:illumina\\tLB:lib180\\tPU:unit1,@RG\\tID:CHI666L7\\tSM:I666\\tPL:illumina\\tLB:lib180\\tPU:unit1,@RG\\tID:CHI666L8\\tSM:I666\\tPL:illumina\\tLB:lib180\\tPU:unit1
+	# There should be no space between comma and read group names
+	# a list of read groups for each single/(pair of) fastq(s)  
+	# each read group is a string
+
+
+organism	hamster
+	# name for the target sample
+
+
+
+
+#----------------- Differential Expression pipeline ------------------
+aligner	gsnap
+	# set aligner to run the pipeline, gsnap and start recomended
+
+
+annotation	/opt/genome/cho/chok1.gff3
+	# annotation file for organism
+
+
+htseqOutPath	/data/RNAseq/htseq_count
+	# pathway in which the htseq count files stores
+
+
+gsnapDbName	chok1
+	# for gsnap need to set this parameter
+
+
+gsnapAnnotation	/opt/genome/cho/gsnap_chok1Db/chok1.maps/chok1.splicesites.iit
+	# annotaton file for gsnap
+
+
+starDbPath	/path/to/index
+	# star database path
+
+
+symbolIDFile	/home/shangzhong/Database/chok1_geneID_symbol.txt
+	# if set, the file to convert gene symbol to gene id
