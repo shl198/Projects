@@ -1,6 +1,6 @@
 import subprocess
-gatk = '/home/shangzhong/Installation/GenomeAnalysisTK-3.2-2/GenomeAnalysisTK.jar'
-def RealignerTargetCreator(dedupbams,reference):
+
+def RealignerTargetCreator(gatk,dedupbams,reference):
     """
     This function creates interval files for realigning.
     Input is deduplicated sorted bam files. reference is 
@@ -14,10 +14,10 @@ def RealignerTargetCreator(dedupbams,reference):
         cmd = cmd + ('java -jar {gatk} -T RealignerTargetCreator '
                '-R {ref_fa} -I {dedup} -o {output} & ').format(
                 gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return interval_files
 
-def IndelRealigner(dedupbams,reference,intervals):
+def IndelRealigner(gatk,dedupbams,reference,intervals):
     """
     This function realigns the deduped bam file to intervals
     reference is fasta file, target is target interval file.
@@ -31,10 +31,10 @@ def IndelRealigner(dedupbams,reference,intervals):
                '-I {input} -targetIntervals {target} '
                '-o {output} & ').format(gatk=gatk,ref_fa=reference,
                 input=dedupbam,target=interval,output=realign)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return realigned_files
 
-def HaplotypeCaller_DNA_VCF(recal_files,reference,thread):
+def HaplotypeCaller_DNA_VCF(gatk,recal_files,reference,thread):
     """
     this function use HaplotypeCaller to call the variant
     """
@@ -49,7 +49,7 @@ def HaplotypeCaller_DNA_VCF(recal_files,reference,thread):
         subprocess.call(cmd,shell=True)
     return vcf_files
     
-def HaplotypeCaller_DNA_gVCF(recal_files,reference,thread):
+def HaplotypeCaller_DNA_gVCF(gatk,recal_files,reference,thread):
     """
     this function does calling variant and stores the result 
     into the gVCF file.
@@ -64,10 +64,10 @@ def HaplotypeCaller_DNA_gVCF(recal_files,reference,thread):
                '--variant_index_type LINEAR --variant_index_parameter 128000 ' 
                '-o {output} & ').format(gatk=gatk,
                 ref_fa=reference,input=recal,output=vcf,thread=thread)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return vcf_files
 
-def JointGenotype(gvcf_files,reference,samplename):
+def JointGenotype(gatk,gvcf_files,reference,samplename):
     """
     this function combine all the gVCF files into one
     """
@@ -81,7 +81,7 @@ def JointGenotype(gvcf_files,reference,samplename):
     subprocess.call(cmd,shell=True)
     return output
 
-def SelectVariants(joint_variant,reference,extract_type):
+def SelectVariants(gatk,joint_variant,reference,extract_type):
     """
     this function can extract either SNP or indel from the
     vcf file
@@ -94,7 +94,7 @@ def SelectVariants(joint_variant,reference,extract_type):
     subprocess.call(cmd,shell=True)
     return output
 
-def snpHardFilter(snp_file,reference):
+def snpHardFilter(gatk,snp_file,reference):
     """
     this function will filter the snps, output a gold standard snp database
     """
@@ -110,7 +110,7 @@ def snpHardFilter(snp_file,reference):
     subprocess.call(cmd,shell=True)
     return output
 
-def indelHardFilter(indel_file,reference):
+def indelHardFilter(gatk,indel_file,reference):
     """
     this function filter the indels,output a gold standard indel database
     """
@@ -125,7 +125,7 @@ def indelHardFilter(indel_file,reference):
     subprocess.call(cmd,shell=True)
     return output
 
-def HardFilter(raw_gvcf,reference):
+def HardFilter(gatk,raw_gvcf,reference):
     """
     this function will apply artificial filter for snp and indel
     """
@@ -135,7 +135,7 @@ def HardFilter(raw_gvcf,reference):
     gold_indel = indelHardFilter(raw_indel,reference)
     return [gold_snp,gold_indel]
 
-def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel,roundNum):
+def BaseRecalibrator(gatk,realignbams,reference,gold_snp,gold_indel,roundNum):
     """
     this function do base recalibration
     """
@@ -185,7 +185,7 @@ def BaseRecalibrator(realignbams,reference,gold_snp,gold_indel,roundNum):
     subprocess.call(cmd[:-2],shell=True)
     return recal_bams
   
-def VQSR(raw_gvcf,gold_snp,gold_indel,reference):
+def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference):
     """
     this file does variant qulity score recalibration and filter snps and 
     indels automatically.

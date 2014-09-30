@@ -1,11 +1,10 @@
 import subprocess
-picard = '/home/shangzhong/Installation/picard-tools-1.113/picard-tools-1.113'
 
 def read_group(ID,sample,platform,library,platunit):
     return ('@RG\\tID:'+ID+'\\tSM:'+sample+'\\tPL:'+platform+'\\tLB:'+library
             +'\\tPU:'+platunit)
     #@RG\\tID:chosgroup1\\tSM:sample1\\tPL:illumina\\tLB:lib1\\tPU:unit1
-def sam2sortbam(samfiles):
+def sam2sortbam(picard,samfiles):
     """
     this function change samfile to sorted bam file
     """
@@ -20,7 +19,7 @@ def sam2sortbam(samfiles):
         subprocess.call(cmd,shell=True)
     return sorted_files
 
-def markduplicates(sortbam):
+def markduplicates(picard,sortbam):
     """
     this function mark duplicates of the sorted bam file
     """
