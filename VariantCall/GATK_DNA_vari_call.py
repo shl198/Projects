@@ -18,18 +18,22 @@ from Modules.FileProcess import remove,get_parameters,rg_bams
    running pipeline
 """
 
-parFile = '/home/shangzhong/Codes/Pipeline/VariantCall/Parameters.txt'
-#parFile = sys.argv[2]
+#parFile = '/home/shangzhong/Codes/Pipeline/VariantCall/Parameters.txt'
+parFile = sys.argv[1]
 param = get_parameters(parFile)
 thread = param['thread']
 email = param['email']
+startMessage = param['startMessage']
+endMessage = param['endMessage']
 
 ref_fa = param['refSequence']
 file_path = param['filePath']
 bwaDb = param['alignerDb']
 trim = param['trim']
 phred = param['phred']
+picard = param['picard']
 
+gatk = param['gatk']
 read_group = param['readGroup']
 organism = param['organism']
 ##*****************  Part 0. Build index file for bwa and GATK ******
@@ -37,7 +41,7 @@ organism = param['organism']
 #========  1. map and dedupping =====================================
 #========  (0) enter the directory ========================
 os.chdir(file_path)
-Message(param['startMessage'],email)
+Message(startMessage,email)
 #========  (1) read files  ================================
 fastqFiles = list_files(file_path)
 if trim == 'True':
@@ -50,13 +54,13 @@ map_sam = bwa_vari(read_group,fastqFiles,bwaDb,thread)
 #========  (4) Convert sam to sorted bam ==================
 sort_bams = sam2bam_sort(map_sam,thread)
 #========  (5) Markduplicates using picard ================
-dedup_files = markduplicates(sort_bams)
+dedup_files = markduplicates(picard,sort_bams)
 remove(sort_bams)
 #========  2. Indel realignment  ====================================
 #========  (6) Create a target list of intervals===========
-interval = RealignerTargetCreator(dedup_files,ref_fa)
+interval = RealignerTargetCreator(gatk,dedup_files,ref_fa)
 #========  (7) realignment of target intervals ============
-realign_bams = IndelRealigner(dedup_files,ref_fa,interval)
+realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval)
 remove(dedup_files)
 #========  3. Base quality recalibration  =================
 
@@ -72,41 +76,41 @@ remove(dedup_files)
 #BQSR_round = 1
 #for roundNum in range(BQSR_round):
 roundNum = 1
-raw_gvcf_files = HaplotypeCaller_DNA_gVCF(realign_bams,ref_fa,thread)
+raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
 #========  (3) Joint Genotyping ===========================
-joint_gvcf_file = JointGenotype(raw_gvcf_files,ref_fa,organism)
+joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism)
 #*********** since we don't have the dbsnp for CHO, we need to repeat 
 #*********** base reaclibration until it converge.
 #========  (4) Variant hard filter  =======================
-gold_files = HardFilter(joint_gvcf_file,ref_fa)
+gold_files = HardFilter(gatk,joint_gvcf_file,ref_fa)
 #========  (5) Base Recalibration  ========================
-recal_bam_files = BaseRecalibrator(realign_bams,ref_fa,gold_files[0],
+recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
                                        gold_files[1],roundNum)
 #======== second round ====================================
 roundNum = 2
-raw_gvcf_files = HaplotypeCaller_DNA_gVCF(recal_bam_files,ref_fa,thread)
-joint_gvcf_file = JointGenotype(raw_gvcf_files,ref_fa,organism)
+raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,recal_bam_files,ref_fa,thread)
+joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism)
 
-gold_files = HardFilter(joint_gvcf_file,ref_fa)
-recal_bam_files = BaseRecalibrator(realign_bams,ref_fa,gold_files[0],
+gold_files = HardFilter(gatk,joint_gvcf_file,ref_fa)
+recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
                                        gold_files[1],roundNum)
 #========  !!! merge lanes for the same sample ============
 if len(recal_bam_files!=1):
     merged_bams = rg_bams(read_group,recal_bam_files)
     remove(recal_bam_files)
-    dedup_files = markduplicates(merged_bams)
+    dedup_files = markduplicates(picard,merged_bams)
     remove(merged_bams)
-    realign_bams = IndelRealigner(dedup_files,ref_fa,interval)
+    realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval)
     remove(dedup_files)
     
 #========  (6) call variant  ==============================
-raw_gvcf_files = HaplotypeCaller_DNA_gVCF(realign_bams,ref_fa,thread)
+raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
 #========  (7) Joint Genotyping  ==========================
-joint_gvcf_file = JointGenotype(raw_gvcf_files,ref_fa,organism)
+joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism)
 
 #========  (8) VQSR  ======================================
 #gold_files = HardFilter(joint_gvcf_file,ref_fa)
-recal_variant = VQSR(joint_gvcf_file,gold_files[0],gold_files[1],ref_fa)
+recal_variant = VQSR(gatk,joint_gvcf_file,gold_files[0],gold_files[1],ref_fa)
 
-Message(param['endMessage'],email)
+Message(endMessage,email)
 ##=================  Part III. Analyze Variant  =====================

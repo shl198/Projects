@@ -1,0 +1,86 @@
+# This file includes all parameters that need to be set for all pipelines.
+
+##===============  global parameters ================================
+thread	20
+	# number of threads
+
+
+email	shl198@eng.ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	CHOSVSCHOK1 start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	CHOSVSCHOK1 end
+	# message which will be sent to email when pipeline finishes
+
+
+refSequence	/opt/genome/cho/cgr_ref_CriGri_1.0_chrUn.fa
+	# fasta file of target organism
+
+
+filePath	/home/shangzhong/Desktop/RNAvairtest
+	# folder where fastq files locate
+
+
+alignerDb	/opt/genome/cho/STAR_chok1Db
+	# index of refSequence for aligner to be used
+
+
+trim	False
+	# choose whether to trim the origional fastq files
+
+
+phred	33
+	# encoding score for raw data.
+	# other option: 64
+
+
+picard	/home/shangzhong/Installation/picard-tools-1.113/picard-tools-1.113
+	# picard folder pathway
+
+
+##================ parameters for specific pipeline ==================
+#----------------- GATK pipeline -------------------------------------
+gatk	/home/shangzhong/Installation/GenomeAnalysisTK-3.2-2/GenomeAnalysisTK.jar
+	# pathway to gatk
+
+
+readGroup	@RG\\tID:CHOA4\\tSM:CHOS\\tPL:illumina\\tLB:lib1\\tPU:unit1,@RG\\tID:CHOA12\\tSM:CHOS\\tPL:illumina\\tLB:lib1\\tPU:unit1
+	# There should be no space between comma and read group names
+	# a list of read groups for each single/(pair of) fastq(s)  
+	# each read group is a string
+
+
+organism	CHOS
+	# name for the target sample
+
+
+
+
+#----------------- Differential Expression pipeline ------------------
+aligner	gsnap
+	# set aligner to run the pipeline, gsnap and start recomended
+
+
+annotation	/opt/genome/cho/chok1.gff3
+	# annotation file for organism
+
+
+htseqOutPath	/data/RNAseq/htseq_count
+	# pathway in which the htseq count files stores
+
+
+gsnapDbName	chok1
+	# for gsnap need to set this parameter
+
+
+gsnapAnnotation	/opt/genome/cho/gsnap_chok1Db/chok1.maps/chok1.splicesites.iit
+	# annotaton file for gsnap
+
+
+symbolIDFile	/home/shangzhong/Database/chok1_geneID_symbol.txt
+	# if set, the file to convert gene symbol to gene id
