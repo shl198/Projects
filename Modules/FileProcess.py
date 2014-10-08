@@ -3,13 +3,14 @@ from f03_samtools import merge_bam
 def remove(files):
     """
     this function can remove files provided
+    Arguments:  1. files: a list of files to be removed
     """
     if isinstance(files,str):
         subprocess.call('rm {file}'.format(file=files),shell=True)
     if isinstance(files,list):
         cmd = ''
         for f in files:
-            cmd = cmd + 'rm {file} & '.format(file=f)
+            cmd = cmd + ('rm {file} & ').format(file=f)
         subprocess.call(cmd[:-3],shell=True)
     
 
@@ -53,8 +54,13 @@ def rg_bams(rgs,bamfiles):
             readic[sample] = [bam]
     merged = []
     for sample in readic:
-        output = sample + '.bam'
+        output = sample + '.merged.sort.bam'
         merged.append(output)
-        merge_bam(readic[sample],output)
+        if len(readic[sample]) == 1:
+            renameCmd = ('mv {before} {after}').format(
+                    before=readic[sample][0],after=output)
+            subprocess.call(renameCmd,shell=True)
+        else:
+            merge_bam(readic[sample],output)
     return merged
 
