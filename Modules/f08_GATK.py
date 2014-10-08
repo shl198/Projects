@@ -1,6 +1,6 @@
 import subprocess
 
-def RealignerTargetCreator(gatk,dedupbams,reference):
+def RealignerTargetCreator(gatk,dedupbams,reference,thread):
     """
     This function creates interval files for realigning.
     Input is deduplicated sorted bam files. reference is 
@@ -11,9 +11,11 @@ def RealignerTargetCreator(gatk,dedupbams,reference):
     for dedupbam in dedupbams:  #file name is name.dedup.bam
         interval = dedupbam[:-9] + 'interval.list'
         interval_files.append(interval)
-        cmd = cmd + ('java -jar {gatk} -T RealignerTargetCreator '
-               '-R {ref_fa} -I {dedup} -o {output} & ').format(
-                gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval)
+        singleCmd =  ('java -jar {gatk} -T RealignerTargetCreator '
+               '-R {ref_fa} -I {dedup} -o {output} -nt {thread}').format(
+                gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval,
+                thread=thread)
+        cmd = cmd + singleCmd + ' && '
     subprocess.call(cmd[:-3],shell=True)
     return interval_files
 
@@ -45,7 +47,7 @@ def HaplotypeCaller_DNA_VCF(gatk,recal_files,reference,thread):
         cmd = ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
                '-I {input} -nct {thread} --genotyping_mode DISCOVERY -stand_emit_conf 15 ' 
                '-stand_call_conf 30 -o {output}').format(gatk=gatk,
-                ref_fa=reference,input=recal,output=vcf,thread=thread)
+                ref_fa=reference,input=recal,output=vcf,thread='2')
         subprocess.call(cmd,shell=True)
     return vcf_files
     
@@ -60,14 +62,14 @@ def HaplotypeCaller_DNA_gVCF(gatk,recal_files,reference,thread):
         vcf = recal[:-9] + 'raw.g.vcf'
         vcf_files.append(vcf)
         cmd = cmd + ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
-               '-I {input} -nct {thread} --emitRefConfidence GVCF ' 
+               '-I {input} --emitRefConfidence GVCF ' 
                '--variant_index_type LINEAR --variant_index_parameter 128000 ' 
                '-o {output} & ').format(gatk=gatk,
-                ref_fa=reference,input=recal,output=vcf,thread=thread)
+                ref_fa=reference,input=recal,output=vcf)
     subprocess.call(cmd[:-3],shell=True)
     return vcf_files
 
-def JointGenotype(gatk,gvcf_files,reference,samplename):
+def JointGenotype(gatk,gvcf_files,reference,samplename,thread):
     """
     this function combine all the gVCF files into one
     """
@@ -76,21 +78,21 @@ def JointGenotype(gatk,gvcf_files,reference,samplename):
     for gvcf in gvcf_files:  # use for loop to generate a set of --variant 
         vcf = vcf + '--variant ' + gvcf + ' '
     cmd = ('java -jar {gatk} -R {ref_fa} -T GenotypeGVCFs {vcf}'
-           '-o {output}').format(gatk=gatk,ref_fa=reference,vcf=vcf,
-                                 output=output)
+           '-o {output} -nt {thread}').format(gatk=gatk,ref_fa=reference,
+            vcf=vcf,output=output,thread=thread)
     subprocess.call(cmd,shell=True)
     return output
 
-def SelectVariants(gatk,joint_variant,reference,extract_type):
+def SelectVariants(gatk,joint_variant,reference,extract_type,thread):
     """
     this function can extract either SNP or indel from the
     vcf file
     """
     output = joint_variant[:-5] + extract_type.lower() + '.vcf'  # sample.raw.snp.vcf
     cmd = ('java -jar {gatk} -T SelectVariants -R {ref_fa} -V {input} '
-           '-selectType {type} -o {output}').format(gatk=gatk, 
+           '-selectType {type} -o {output} -nt {thread}').format(gatk=gatk, 
             ref_fa=reference,input=joint_variant,type=extract_type,
-            output=output)
+            output=output,thread=thread)
     subprocess.call(cmd,shell=True)
     return output
 
@@ -125,17 +127,17 @@ def indelHardFilter(gatk,indel_file,reference):
     subprocess.call(cmd,shell=True)
     return output
 
-def HardFilter(gatk,raw_gvcf,reference):
+def HardFilter(gatk,raw_gvcf,reference,thread):
     """
     this function will apply artificial filter for snp and indel
     """
-    raw_snp = SelectVariants(raw_gvcf,reference,'SNP')
-    raw_indel= SelectVariants(raw_gvcf,reference,'INDEL')
-    gold_snp = snpHardFilter(raw_snp,reference)
-    gold_indel = indelHardFilter(raw_indel,reference)
+    raw_snp = SelectVariants(gatk,raw_gvcf,reference,'SNP',thread)
+    raw_indel= SelectVariants(gatk,raw_gvcf,reference,'INDEL',thread)
+    gold_snp = snpHardFilter(gatk,raw_snp,reference)
+    gold_indel = indelHardFilter(gatk,raw_indel,reference)
     return [gold_snp,gold_indel]
 
-def BaseRecalibrator(gatk,realignbams,reference,gold_snp,gold_indel,roundNum):
+def BaseRecalibrator(gatk,realignbams,reference,gold_snp,gold_indel,roundNum,thread):
     """
     this function do base recalibration
     """
@@ -147,9 +149,10 @@ def BaseRecalibrator(gatk,realignbams,reference,gold_snp,gold_indel,roundNum):
         recal_tables.append(table)
         cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
            '-I {realignbam} -knownSites {snp} -knownSites {indel} '
-           '-o {output} & ').format(gatk=gatk,ref_fa=reference,realignbam=realign,
-                        snp=gold_snp,indel=gold_indel,output=table)
-    subprocess.call(cmd[:-2],shell=True)
+           '-o {output} -nct {thread} && ').format(gatk=gatk,ref_fa=reference,
+            realignbam=realign,snp=gold_snp,indel=gold_indel,
+            output=table,thread=thread)
+    subprocess.call(cmd[:-3],shell=True)
     
     # 2. Do a second pass to analyze covariation remaining after recalibration
     cmd = ''
@@ -159,19 +162,21 @@ def BaseRecalibrator(gatk,realignbams,reference,gold_snp,gold_indel,roundNum):
         recal_post_tables.append(post_table)
         cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
            '-I {realignbam} -knownSites {snp} -knownSites {indel} -BQSR {table} '
-           '-o {output} & ').format(gatk=gatk,ref_fa=reference,realignbam=realign,
-                        snp=gold_snp,indel=gold_indel,output=post_table,table=table)
-    subprocess.call(cmd[:-2],shell=True)
+           '-o {output} -nct {thread} && ').format(gatk=gatk,
+            ref_fa=reference,realignbam=realign,snp=gold_snp,
+            indel=gold_indel,output=post_table,table=table,
+            thread=thread)
+    subprocess.call(cmd[:-3],shell=True)
     
     # 3. Generate before/after plots
     cmd = ''
     for table,post_table in zip(recal_tables,recal_post_tables):
         plot = table[:-11] + str(roundNum) + 'recal_plots.pdf'
         cmd = cmd + ('java -jar {gatk} -T AnalyzeCovariates -R {ref_fa} '
-                     '-before {table} -after {post_table} -plots {output} & ').format(
+                     '-before {table} -after {post_table} -plots {output} && ').format(
                     gatk=gatk,ref_fa=reference,table=table,post_table=post_table,
                     output=plot)
-    subprocess.call(cmd[:-2],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     
     # 4. Apply the recalibration to your sequence data
     cmd = ''
@@ -180,12 +185,13 @@ def BaseRecalibrator(gatk,realignbams,reference,gold_snp,gold_indel,roundNum):
         recal_bam = realign[:-9] + 'recal.bam'
         recal_bams.append(recal_bam)
         cmd = cmd + ('java -jar {gatk} -T PrintReads -R {ref_fa} '
-        '-I {input} -BQSR {table} -o {output} & ').format(gatk=gatk,
-        ref_fa=reference,input=realign,table=table,output=recal_bam)
-    subprocess.call(cmd[:-2],shell=True)
+        '-I {input} -BQSR {table} -o {output} -nct {thread} && ').format(gatk=gatk,
+        ref_fa=reference,input=realign,table=table,output=recal_bam,
+        thread=thread)
+    subprocess.call(cmd[:-3],shell=True)
     return recal_bams
   
-def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference):
+def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference,thread):
     """
     this file does variant qulity score recalibration and filter snps and 
     indels automatically.
@@ -198,9 +204,11 @@ def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference):
            '-resource:dbsnp,known=false,training=true,truth=true,prior=10.0 '
            '{gold} -an DP -an QD -an FS -an MQRankSum -an ReadPosRankSum '
            '-mode SNP -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 '
-           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot} -nt 5').format(
+           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot} '
+           '-nt {thread}').format(
             gatk=gatk,ref_fa=reference,input=raw_gvcf,gold=gold_snp,
-            recal=recal_snp,tranch=tranch_snp,rplot=rplot_snp)
+            recal=recal_snp,tranch=tranch_snp,rplot=rplot_snp,
+            thread=thread)
     subprocess.call(cmd,shell=True)
     
     # 2. apply the desired level of recalibration to the SNPs in the call set
@@ -220,9 +228,11 @@ def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference):
            '-resource:indel,known=false,training=true,truth=true,prior=10.0 '
            '{gold} -an DP -an FS -an MQRankSum -an ReadPosRankSum '
            '-mode INDEL -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 '
-           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot}').format(
+           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot} ' 
+           '-nt {thread}').format(
             gatk=gatk,ref_fa=reference,input=raw_gvcf,gold=gold_indel,
-            recal=recal_indel,tranch=tranch_indel,rplot=rplot_indel)
+            recal=recal_indel,tranch=tranch_indel,rplot=rplot_indel,
+            thread=thread)
     subprocess.call(cmd,shell=True)
     
     # 4. apply the desired level of recalibration to the Indels in the call set
@@ -234,3 +244,111 @@ def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference):
             output=recal_variant)
     subprocess.call(cmd,shell=True)
     return recal_variant
+
+##***************** RNA specific **************************
+def splitN(gatk,dedupBams,ref_fa):
+    """
+    This function splits reads due to wrong splicing by STAR
+    """
+    splitBams = []
+    cmd = ''
+    for dedup in dedupBams:
+        split = dedup[:-9] + 'split.bam'
+        splitBams.append(split)
+        cmd = cmd + ('java -jar {gatk} -T SplitNCigarReads -R {ref_fa} '
+                     '-I {input} -o {output} -rf ReassignOneMappingQuality '
+                     '-RMQF 255 -RMQT 60 -U ALLOW_N_CIGAR_READS && ').format(
+                    gatk=gatk,ref_fa=ref_fa,input=dedup,output=split)
+    subprocess.call(cmd[:-3],shell=True)
+    return splitBams
+
+def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference):
+    """
+    This function calls variants in RNAseq
+    """
+    vcf_files = []
+    cmd = ''
+    for recal in recal_files:
+        vcf = recal[:-9] + 'vcf'
+        vcf_files.append(vcf)
+        cmd = cmd + ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
+        '-I {input} -recoverDanglingHeads -dontUseSoftClippedBases ' 
+        '-stand_call_conf 20.0 -stand_emit_conf 20.0 -o {output} '
+        '& ').format(
+        gatk=gatk,ref_fa=reference,input=recal,output=vcf)
+    subprocess.call(cmd[:-3],shell=True)
+    return vcf_files
+
+def RNA_Vari_Filter(gatk,vcfs,ref_fa):
+    """
+    This function filter out the results of the vari call 
+    """
+    filter_files = []
+    cmd = ''
+    for vcf in vcfs:
+        filter_vcf = vcf[:-3] + 'filter.vcf'
+        filter_files.append(filter_vcf)
+        FS = """'FS > 30.0'"""
+        QD = """'QD < 2.0'"""
+        cmd = cmd + ('java -jar {gatk} -T VariantFiltration -R {ref_fa} '
+                     '-V {input} -window 35 -cluster 3 -filterName FS '
+                     '-filter {FS} -filterName QD -filter {QD} '
+                     '-o {output} && ').format(gatk=gatk,ref_fa=ref_fa,
+                    input=vcf,FS=FS,QD=QD,output=filter_vcf)
+    subprocess.call(cmd[:-3],shell=True)
+    return filter_files
+
+def RNA_BaseRecalibrator(gatk,realignbams,reference,gold_vcfs,roundNum,thread):
+    """
+    this function do base recalibration
+    """
+    # 1. Analyze patterns of covariation in the sequence dataset
+    cmd = ''
+    recal_tables = []
+    for realign,gold in zip(realignbams,gold_vcfs):
+        table = realign[:-9] + 'recal.table'
+        recal_tables.append(table)
+        cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
+           '-I {realignbam} -knownSites {gold} '
+           '-o {output} -nct {thread} && ').format(gatk=gatk,ref_fa=reference,
+            realignbam=realign,gold=gold,
+            output=table,thread=thread)
+    subprocess.call(cmd[:-3],shell=True)
+    
+    # 2. Do a second pass to analyze covariation remaining after recalibration
+    cmd = ''
+    recal_post_tables = []
+    for realign,table,gold in zip(realignbams,recal_tables,gold_vcfs):
+        post_table = realign[:-9] + 'post_recal.table'
+        recal_post_tables.append(post_table)
+        cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
+           '-I {realignbam} -knownSites {gold} -BQSR {table} '
+           '-o {output} -nct {thread} && ').format(gatk=gatk,
+            ref_fa=reference,realignbam=realign,gold=gold,
+            output=post_table,table=table,
+            thread=thread)
+    subprocess.call(cmd[:-3],shell=True)
+    
+    # 3. Generate before/after plots
+    cmd = ''
+    for table,post_table in zip(recal_tables,recal_post_tables):
+        plot = table[:-11] + str(roundNum) + 'recal_plots.pdf'
+        cmd = cmd + ('java -jar {gatk} -T AnalyzeCovariates -R {ref_fa} '
+                     '-before {table} -after {post_table} -plots {output} && ').format(
+                    gatk=gatk,ref_fa=reference,table=table,post_table=post_table,
+                    output=plot)
+    subprocess.call(cmd[:-3],shell=True)
+    
+    # 4. Apply the recalibration to your sequence data
+    cmd = ''
+    recal_bams = []
+    for realign,table in zip(realignbams,recal_tables):
+        recal_bam = realign[:-9] + 'recal.bam'
+        recal_bams.append(recal_bam)
+        cmd = cmd + ('java -jar {gatk} -T PrintReads -R {ref_fa} '
+        '-I {input} -BQSR {table} -o {output} -nct {thread} && ').format(gatk=gatk,
+        ref_fa=reference,input=realign,table=table,output=recal_bam,
+        thread=thread)
+    subprocess.call(cmd[:-3],shell=True)
+    return recal_bams
+    
