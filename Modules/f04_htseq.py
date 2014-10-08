@@ -7,6 +7,6 @@ def htseq_count(sortedBamFiles,annotation,outputpath):
     for bamfile in sortedBamFiles: 
         outputfile = outputpath + '/' + bamfile[:-3] + 'txt'
         htseqCmd = ('htseq-count -f bam -r pos -s no -t exon -i gene {bam} {annotation} '
-        '> {output} & ').format(bam=bamfile, annotation = annotation,output=outputfile)
+        '> {output} && ').format(bam=bamfile, annotation = annotation,output=outputfile)
         cmd = cmd + htseqCmd
     subprocess.call(cmd[:-3],shell=True)

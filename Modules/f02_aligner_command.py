@@ -1,4 +1,5 @@
 import subprocess
+import os
 #==========  gsnap alignment  ==========================
 def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
     """
@@ -19,24 +20,24 @@ def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
         if annotation == '':
             if len(fastq) == 2:
                 cmd = cmd + ('gsnap -D {db_path} -d {db_name} --gunzip -A sam -B 4 -i 2 -t {thread} '
-                            '-N 1 {fastq1} {fastq2} > {output} & ').format(
+                            '-N 1 {fastq1} {fastq2} > {output} && ').format(
                             db_path=db_path,db_name=db_name,thread=thread,
                             fastq1=fastq[0],fastq2=fastq[1],output=output)
             else:
                 cmd = cmd + ('gsnap -D {db_path} -d {db_name} -A sam --gunzip -B 4 -i 2 -t {thread} '
-                            '-N 1 {fastq} > {output} & ').format(db_path=db_path,
+                            '-N 1 {fastq} > {output} && ').format(db_path=db_path,
                             db_name=db_name,thread=thread,
                             fastq=fastq[0],output=output)
         #-------- map with annotation ------------
         else:
             if len(fastq) == 2:
                 cmd = cmd + ('gsnap -D {db_path} -d {db_name} --gunzip -A sam -B 4 -i 2 -t {thread} '
-                            '-N 1 -s {annotation} {fastq1} {fastq2} > {output} & ').format(
+                            '-N 1 -s {annotation} {fastq1} {fastq2} --force-xs-dir > {output} && ').format(
                             db_path=db_path,db_name=db_name,thread=thread,annotation=annotation,
                             fastq1=fastq[0],fastq2=fastq[1],output=output)
             else:
                 cmd = cmd + ('gsnap -D {db_path} -d {db_name} -A sam --gunzip -B 4 -i 2 -t {thread} '
-                            '-N 1 -s {annotation} {fastq} > {output} & ').format(db_path=db_path
+                            '-N 1 -s {annotation} {fastq} --force-xs-dir > {output} && ').format(db_path=db_path
                             ,db_name=db_name,thread=thread,annotation=annotation,
                             fastq=fastq[0],output=output)
     subprocess.call(cmd[:-3],shell=True)
@@ -58,7 +59,7 @@ def bowtie2(fastqFiles,database,thread=1):
                              fastq1 = fastq[0], fastq2 = fastq[1],outputfile=output)
         else:
             cmd = cmd + ('bowtie2 -x {database} -p {thread} -U {fastq} '
-                         '-S {outputfile} & ').format(database=database,
+                         '-S {outputfile} && ').format(database=database,
                         thread = thread, fastq = fastq[0], outputfile=output)
     subprocess.call(cmd[:-3],shell=True)
     return map_result
@@ -82,7 +83,7 @@ def tophat(fastqFiles,database,annotation,thread=1):
             output = fastq[0][:-8] + '_map'
             map_result.append(output)
             cmd = cmd + ('tophat -p {thread} -G {gff} --b2-very-sensitive -o {output} '
-            '{reference} {fastq} & ').format(thread = thread, gff = annotation, 
+            '{reference} {fastq} && ').format(thread = thread, gff = annotation, 
             output = output,reference = database, fastq = fastq[0])
     subprocess.call(cmd[:-3],shell=True)
     return map_result
@@ -131,7 +132,7 @@ def STAR(fastqFiles,db_path,thread=1):
     """
     STAR are more proper for aligning RNA seq
     """
-    map_result = []
+    map_results = []
     cmd = ''
     for fastq in fastqFiles:
         #------- define output sam file name ----
@@ -139,26 +140,46 @@ def STAR(fastqFiles,db_path,thread=1):
             output = fastq[0][:-8] 
         else:
             output = fastq[0][:-5]
-        map_result.append(output + 'Aligned.out.sam')
+        map_results.append(output + 'Aligned.out.sam')
         #-------- map without annotation ---------
         if len(fastq) == 2:
             cmd = cmd + ('STAR --genomeDir {ref} '
                          '--readFilesCommand zcat '
                          '--readFilesIn {fq1} {fq2} --runThreadN '
-                         '{thread} --outFilesNamePrefix {output} & ').format(
+                         '{thread} --outFileNamePrefix {output} && ').format(
                         ref=db_path,fq1=fastq[0],fq2=fastq[1],
                         thread=thread,output=output)
         else:
             cmd = cmd + ('STAR --genomeDir {ref} '
                          '--readFilesCommand zcat '
                          '--readFilesIn {fq1} --runThreadN '
-                         '{thread} --outFileNamePrefix {output} & ').format(
-                        ref=db_path,fastq1=fastq[0],
+                         '{thread} --outFileNamePrefix {output} && ').format(
+                        ref=db_path,fq1=fastq[0],
                         thread=thread,output=output)
     subprocess.call(cmd[:-3],shell=True)
     final_name = []
-    for sam in map_result:
+    for sam in map_results:
+        new_name = sam[:-15] + 'sam'
         rename = ('mv {star_result} {modified_name}').format(star_result=sam,
-                  modified_name=sam[:-15] + 'sam')
-        final_name.append(rename)
+                  modified_name=new_name)
+        final_name.append(new_name)
+        subprocess.call(rename,shell=True)
     return final_name
+
+#============  STAR 2 pass alignment  ===============================
+def STAR2Pass(fastqFiles,starDb,ref_fa,thread=1):
+    # this function run 2 pass of mapping
+    map_sams = STAR(fastqFiles,starDb,thread)
+    if not os.path.exists("starDb2Pass"):
+        subprocess.call('mkdir starDb2Pass',shell=True)
+    for sam,fastq in zip(map_sams,fastqFiles):
+        SJFile = sam[:-3] + 'SJ.out.tab'
+        cmd = ('STAR --runMode genomeGenerate --genomeDir starDb2Pass '
+               '--genomeFastaFiles {ref_fa} --sjdbFileChrStartEnd {SJ} '
+               '--sjdbOverhang 100 --runThreadN {thread} '
+               '--limitGenomeGenerateRAM 310000000000').format(
+                ref_fa=ref_fa,SJ=SJFile,thread=thread)
+        subprocess.call(cmd,shell=True)
+        result = STAR([fastq],'starDb2Pass',thread)
+    subprocess.call('rm -r starDb2Pass',shell=True)
+    return map_sams
