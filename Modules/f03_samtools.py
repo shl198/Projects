@@ -21,7 +21,7 @@ def sam2bam_sort(samfiles,thread=1):
         rmSamCmd = rmSamCmd + 'rm {sam} & '.format(sam=sam)
         # sort bam file
         sortBamCmd = sortBamCmd + ('samtools sort -m 4G -@ {thread} -T {sort} {bam} '
-                                   '-o {sortbam} & ').format(thread=thread,sort=sort,
+                                   '-o {sortbam} && ').format(thread=thread,sort=sort,
                                     bam=bam,sortbam=sort_bam)
         # index bam file
         indexCmd = indexCmd + 'samtools index {sortbam} & '.format(sortbam=sort_bam)

@@ -87,7 +87,7 @@ def list_files(file_path):
     
     return fastqFiles
 
-def Trimmomatic(fastqFiles,phred):
+def Trimmomatic(fastqFiles,phred = '33'):
     """
     this function trims fastq files using Trimmomatic
     """
@@ -103,11 +103,12 @@ def Trimmomatic(fastqFiles,phred):
         if len(fastq) ==2:
             cmd = cmd + ('java -jar {Trim} PE -threads {thread} -phred{type} {fastq1} {fastq2} '
             '{Trimmed1} unpair1.fq.gz {Trimmed2} unpair2.fq.gz SLIDINGWINDOW:5:10 LEADING:15 '
-            'TRAILING:10 MINLEN:36 & ').format(Trim = Trimmomatic,thread = '5', type=phred,
+            'TRAILING:10 MINLEN:36 TOPHRED33 & ').format(Trim = Trimmomatic,thread = '5', type=phred,
             fastq1 = fastq[0], fastq2=fastq[1], Trimmed1 = trimFastq[0], Trimmed2 = trimFastq[1])
         else:
             cmd = cmd + ('java -jar {Trim} SE -threads {thread} -phred{type} {input} {output} '
-            'ILLUMINACLIP:{adapter}:2:30:10 SLIDINGWINDOW:5:10 LEADING:2 TRAILING:2 MINLEN:36 & ').format(
+            'ILLUMINACLIP:{adapter}:2:30:10 SLIDINGWINDOW:5:10 LEADING:2 TRAILING:2 '
+            'MINLEN:36 TOPHRED33 & ').format(
             Trim = Trimmomatic,thread = '5',input = fastq[0],output =trimFastq[0],type=phred,
             adapter = adapter_file)
     subprocess.call(cmd[:-2],shell=True)
