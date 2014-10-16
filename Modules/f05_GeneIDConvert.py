@@ -13,8 +13,9 @@ def ID_Convert(Dict,output_path,inputpath):
         item = line.split(' ')
         dic[item[1][:-1]] = item[0]
     for filename in filelist:
+        outputName = filename[:-3] + 'Count.txt'
         result = open(inputpath + '/' + filename,'r')
-        output = open(output_path + '/' + filename,'w')
+        output = open(output_path + '/' + outputName,'w')
         for line in result:
             item = line.split('\t')
             try:
@@ -24,3 +25,4 @@ def ID_Convert(Dict,output_path,inputpath):
                 output.write('\t'.join(item))
         result.close()
         output.close()
+

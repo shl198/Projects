@@ -1,6 +1,6 @@
 from Bio import SeqIO
 import os 
-def change_name(outputfile,inputfile,inter):
+def change_ncbi_annotation_name(outputfile,inputfile,inter):
     """this function can change the reference name of fasta file to accession number
     """     
     reference = SeqIO.parse(open(inputfile,'rU'),'fasta')
@@ -29,7 +29,23 @@ def remove_duplicate(outputfile,inputfile):
             SeqIO.write(item,output,'fasta')
     output.close()
 
-inputfile = '/opt/genome/hamster/cgr_alt_C_griseus_v1.0_chrUn.fa'
-outputfile = '/opt/genome/hamster/hamster.fa'
+def change_ensembl_annotation_name(outputfile,inputfile):
+    """
+    this function change the reference name of fasta file from ensemble to chromosome number
+    outputfile:    the output file name
+    inputfile:    input file name
+    """
+    reference = SeqIO.parse(open(inputfile,'rU'),'fasta')
+    output = open(outputfile,'w')
+    for item in reference:
+        name = item.description
+        start = name.index('chromosome')
+        end = name.index(',')
+        item.id = name[start + len('chromosome') + 1:end]
+        item.description = ''
+        SeqIO.write(item,output,'fasta')
+    output.close
+inputfile = '/data/shangzhong/human/humanGenome/humangenome.fa'
+outputfile = '/data/shangzhong/human/humanGenome/human.fa'
 inter = '/opt/genome/hamster/inter.fa'
-change_name(outputfile,inputfile,inter)
+change_ensembl_annotation_name(outputfile,inputfile)

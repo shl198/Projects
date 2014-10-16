@@ -16,7 +16,7 @@ def sam2bam_sort(samfiles,thread=1):
         sorted_files.append(sort_bam)
         # sam file to bam file
         sam2bamCmd = sam2bamCmd + ('samtools view -@ {thread} -bS {sam} '
-                                   '-o {bam} & ').format(sam=sam, bam=bam,thread=thread)
+                                   '-o {bam} && ').format(sam=sam, bam=bam,thread=thread)
         # remove sam file
         rmSamCmd = rmSamCmd + 'rm {sam} & '.format(sam=sam)
         # sort bam file

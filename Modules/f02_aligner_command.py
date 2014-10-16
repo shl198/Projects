@@ -19,24 +19,28 @@ def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
         #-------- map without annotation ---------
         if annotation == '':
             if len(fastq) == 2:
-                cmd = cmd + ('gsnap -D {db_path} -d {db_name} --gunzip -A sam -B 4 -i 2 -t {thread} '
+                cmd = cmd + ('gsnap --input-buffer-size=5000 -D {db_path} -d {db_name} --gunzip -A sam '
+                             '-B 4 -i 2 -t {thread} '
                             '-N 1 {fastq1} {fastq2} > {output} && ').format(
                             db_path=db_path,db_name=db_name,thread=thread,
                             fastq1=fastq[0],fastq2=fastq[1],output=output)
             else:
-                cmd = cmd + ('gsnap -D {db_path} -d {db_name} -A sam --gunzip -B 4 -i 2 -t {thread} '
+                cmd = cmd + ('gsnap --input-buffer-size=5000 -D {db_path} -d {db_name} -A sam '
+                             '--gunzip -B 4 -i 2 -t {thread} '
                             '-N 1 {fastq} > {output} && ').format(db_path=db_path,
                             db_name=db_name,thread=thread,
                             fastq=fastq[0],output=output)
         #-------- map with annotation ------------
         else:
             if len(fastq) == 2:
-                cmd = cmd + ('gsnap -D {db_path} -d {db_name} --gunzip -A sam -B 4 -i 2 -t {thread} '
+                cmd = cmd + ('gsnap --input-buffer-size=5000 -D {db_path} -d {db_name} --gunzip -A sam '
+                             '-B 4 -i 2 -t {thread} '
                             '-N 1 -s {annotation} {fastq1} {fastq2} --force-xs-dir > {output} && ').format(
                             db_path=db_path,db_name=db_name,thread=thread,annotation=annotation,
                             fastq1=fastq[0],fastq2=fastq[1],output=output)
             else:
-                cmd = cmd + ('gsnap -D {db_path} -d {db_name} -A sam --gunzip -B 4 -i 2 -t {thread} '
+                cmd = cmd + ('gsnap --input-buffer-size=5000 -D {db_path} -d {db_name} -A sam --gunzip '
+                             '-B 4 -i 2 -t {thread} '
                             '-N 1 -s {annotation} {fastq} --force-xs-dir > {output} && ').format(db_path=db_path
                             ,db_name=db_name,thread=thread,annotation=annotation,
                             fastq=fastq[0],output=output)
@@ -128,9 +132,10 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
     subprocess.call(bwaCmd[:-3],shell=True)
     return map_result        
 #============  STAR alignment  ===============================
-def STAR(fastqFiles,db_path,thread=1):
+def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):
     """
     STAR are more proper for aligning RNA seq
+    otherParameters: a list of added parameters
     """
     map_results = []
     cmd = ''
@@ -143,19 +148,23 @@ def STAR(fastqFiles,db_path,thread=1):
         map_results.append(output + 'Aligned.out.sam')
         #-------- map without annotation ---------
         if len(fastq) == 2:
-            cmd = cmd + ('STAR --genomeDir {ref} '
+            starCmd = ('STAR --genomeDir {ref} '
                          '--readFilesCommand zcat '
                          '--readFilesIn {fq1} {fq2} --runThreadN '
-                         '{thread} --outFileNamePrefix {output} && ').format(
+                         '{thread} --outFileNamePrefix {output} '
+                         '--outSAMunmapped Within').format(
                         ref=db_path,fq1=fastq[0],fq2=fastq[1],
                         thread=thread,output=output)
+            cmd = cmd + starCmd + ' ' + ' '.join(otherParameters) + ' && '
         else:
-            cmd = cmd + ('STAR --genomeDir {ref} '
+            starCmd = ('STAR --genomeDir {ref} '
                          '--readFilesCommand zcat '
                          '--readFilesIn {fq1} --runThreadN '
-                         '{thread} --outFileNamePrefix {output} && ').format(
+                         '{thread} --outFileNamePrefix {output} '
+                         '--outSAMunmapped Within').format(
                         ref=db_path,fq1=fastq[0],
                         thread=thread,output=output)
+            cmd = cmd + starCmd + ' ' + ' '.join(otherParameters) + ' && '
     subprocess.call(cmd[:-3],shell=True)
     final_name = []
     for sam in map_results:
@@ -183,3 +192,4 @@ def STAR2Pass(fastqFiles,starDb,ref_fa,thread=1):
         result = STAR([fastq],'starDb2Pass',thread)
     subprocess.call('rm -r starDb2Pass',shell=True)
     return map_sams
+

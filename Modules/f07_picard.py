@@ -66,4 +66,32 @@ def addReadGroup(picard,sortBamFiles,readgroups):
         renameCmd = ('mv {sortBam} {finalSortBam}').format(sortBam=bam,finalSortBam=finalSortBam)
         subprocess.call(renameCmd,shell=True)
     
-    return final_sort_bams    
+    return final_sort_bams
+
+def sam2fastq(picard,samFiles,endType):
+    """
+    samFiles is a list of sam/bam files
+    Type is single end or paired end
+    """
+    fqs = []
+    cmd = ''
+    sam2fq = picard + '/' + 'SamToFastq.jar'
+    if endType == 'pair':
+        for sam in samFiles:
+            fq1 = sam[:-4] + '_1.fq.gz'
+            fq2 = sam[:-4] + '_2.fq.gz'
+            fqs.append([fq1,fq2])
+            sam2fqCmd = ('java -jar {sam2fq} I={input} F={fq1} F2={fq2} '
+                         'VALIDATION_STRINGENCY=LENIENT').format(
+                        sam2fq=sam2fq,input=sam,fq1=fq1,fq2=fq2)
+            cmd = cmd + sam2fqCmd + ' & '
+    else:
+        for sam in samFiles:
+            fq = sam[:-4] + '.fq.gz'
+            fqs.append(fq)
+            sam2fqCmd = ('java -jar {sam2fq} I={intput} F={fq} '
+                         'VALIDATION_STRINGENCY=LENIENT').format(
+                        sam2fq=sam2fq,input=sam,fq=fq)
+            cmd = cmd + sam2fqCmd + ' & '
+    subprocess.call(cmd[:-3],shell=True)
+    return fqs

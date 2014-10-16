@@ -64,3 +64,15 @@ def rg_bams(rgs,bamfiles):
             merge_bam(readic[sample],output)
     return merged
 
+def changeFastqReadName(fastqFiles):
+    """
+    this function changes fastq file names in order to make sure fastq
+    files be aligned without error
+    """
+    cmd = ''
+    for fq in fastqFiles:
+        output = fq[0][5:]
+        renameCmd = ('gunzip -c {fq} | fastx_renamer -n COUNT '
+                     '-z -o {output}').format(fq=fq[0],output=output)
+        cmd = cmd + renameCmd + ' & '
+    subprocess.call(cmd[:-3],shell=True)
