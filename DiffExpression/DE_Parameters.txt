@@ -1,0 +1,102 @@
+# This file includes all parameters that need to be set for all pipelines.
+# For paired end fastq files, make sure the file name is in the format
+# name1.fq.gz, name2.fq.gz or name1.fastq.gz, name2.fastq.gz
+
+##===============  global parameters ================================
+thread	25
+	# number of threads
+
+
+email	shl198@ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	GlycoCosmic DE start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	GlycoCosmic DE end
+	# message which will be sent to email when pipeline finishes
+
+
+refSequence	/opt/genome/cho/cgr_ref_CriGri_1.0_chrUn.fa
+	# fasta file of target organism
+
+
+filePath	/data/shangzhong/Diff_express/GlycoCosmic
+	# folder where fastq files locate
+
+
+alignerDb	/data/shangzhong/Diff_express/starDB
+	# index of refSequence for aligner to be used
+
+
+trim	False
+	# choose whether to trim the origional fastq files
+
+
+phred	33
+	# encoding score for raw data.
+	# other option: 64
+
+
+picard	/home/shangzhong/Installation/picard-tools-1.121
+	# picard folder pathway
+
+
+trimmomatic	/home/shangzhong/Installation/Trimmomatic-0.32/trimmomatic-0.32.jar
+	# trimmomatic pathway
+
+
+trimmoAdapter	
+	# trimmomatic adapter files
+
+
+##================ parameters for specific pipeline ==================
+#----------------- GATK pipeline -------------------------------------
+# 1. check whether dict and index file for reference fa exist, if not, 
+# use CreateSequenceDictionary from picard tool to generate dict
+# use samtools faidx to generate fai file
+
+gatk	/home/shangzhong/Installation/GenomeAnalysisTK-3.2-2/GenomeAnalysisTK.jar
+	# pathway to gatk
+
+
+readGroup	rg1,rg2,...
+	# a list of read groups for each single/(pair of) fastq(s)  
+	# each read group is a string
+	# There should be no space between comma and read group names
+	#!!! Must be in the order the same as alphabetic order of fastq files
+	
+	
+
+organism	name
+	# name for the target organism
+
+
+
+
+#----------------- Differential Expression pipeline ------------------
+aligner	STAR
+	# set aligner to run the pipeline, gsnap and start recomended
+
+
+annotation	/opt/genome/cho/chok1.gff3
+	# annotation file for organism
+
+
+htseqOutPath	/data/shangzhong/Diff_express/GlycoCosmic/htseqCount
+	# pathway in which the htseq count files stores
+
+
+gsnapDbName	chok1
+	# for gsnap need to set this parameter
+
+
+gsnapAnnotation	/opt/genome/cho/gsnap_chok1Db/chok1.maps/chok1.splicesites.iit
+	# annotaton file for gsnap
+
+
+symbolIDFile	/home/shangzhong/Database/chok1_geneID_symbol.txt
+	# if set, the file to convert gene symbol to gene id
