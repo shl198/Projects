@@ -1,5 +1,6 @@
 import subprocess
 import os
+from os import listdir
 #==========  gsnap alignment  ==========================
 def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
     """
@@ -132,6 +133,20 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
     subprocess.call(bwaCmd[:-3],shell=True)
     return map_result        
 #============  STAR alignment  ===============================
+def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
+    """
+    This function generates database for alignment using STAR
+    """
+    if listdir(db_path) == []:
+        cmd = ('STAR --runMode genomeGenerate --genomeDir {db_path} '
+               '--genomeFastaFiles {ref_fa} --runThreadN {thread} '
+               '--limitGenomeGenerateRAM 310000000000 ').format(
+                db_path=db_path,ref_fa=ref_fa,thread=thread)
+        if annotation != '':
+            cmd = cmd + ('--sjdbGTFfile {gff3} --sjdbGTFtagExonParentTranscript Parent '
+                         '--sjdbOverhang 100').format(gff3=annotation)
+    subprocess.call(cmd,shell=True)
+    
 def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):
     """
     STAR are more proper for aligning RNA seq
