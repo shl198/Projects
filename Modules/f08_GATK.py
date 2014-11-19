@@ -77,7 +77,7 @@ def JointGenotype(gatk,gvcf_files,reference,samplename,thread):
     vcf = ''
     for gvcf in gvcf_files:  # use for loop to generate a set of --variant 
         vcf = vcf + '--variant ' + gvcf + ' '
-    cmd = ('java -jar {gatk} -R {ref_fa} -T GenotypeGVCFs {vcf}'
+    cmd = ('java -Xmx100g -jar {gatk} -R {ref_fa} -T GenotypeGVCFs {vcf}'
            '-o {output} -nt {thread}').format(gatk=gatk,ref_fa=reference,
             vcf=vcf,output=output,thread=thread)
     subprocess.call(cmd,shell=True)
