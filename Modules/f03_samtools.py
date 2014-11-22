@@ -75,3 +75,16 @@ def merge_bam(bamfiles,outputbam):
     bam = ' '.join(bamfiles)
     cmd = ('samtools merge -f {output} {input}').format(output=outputbam,input=bam)
     subprocess.call(cmd,shell=True)
+    
+    
+def index_bam(bamFiles):
+    """
+    This function indexes bam files for easy of access
+    """
+    cmd = ''
+    for bam in bamFiles:
+        cmd = cmd + 'samtools index {bam} & '.format(bam=bam)
+    subprocess.call(cmd[:-3],shell=True)
+    print 'done'
+    
+    
