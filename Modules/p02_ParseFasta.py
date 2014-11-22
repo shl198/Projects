@@ -32,8 +32,8 @@ def remove_duplicate(outputfile,inputfile):
 def change_ensembl_annotation_name(outputfile,inputfile):
     """
     this function change the reference name of fasta file from ensemble to chromosome number
-    outputfile:    the output file name
-    inputfile:    input file name
+    outputfile:    fasta output file name
+    inputfile:    fasta input file name
     """
     reference = SeqIO.parse(open(inputfile,'rU'),'fasta')
     output = open(outputfile,'w')
@@ -45,7 +45,23 @@ def change_ensembl_annotation_name(outputfile,inputfile):
         item.description = ''
         SeqIO.write(item,output,'fasta')
     output.close
-inputfile = '/data/shangzhong/human/humanGenome/humangenome.fa'
-outputfile = '/data/shangzhong/human/humanGenome/human.fa'
-inter = '/opt/genome/hamster/inter.fa'
-change_ensembl_annotation_name(outputfile,inputfile)
+
+
+def extractRefseqPr(outputFile,refProteinFile,organism):
+    """
+    This function extracts the proteins of specific organism
+    from refseq protein file which include all proteins.
+    
+    * refProtein: the refseq fasta file proteins
+    
+    * organism: organism name, must be the same as ncbi defines
+    """
+    res = SeqIO.parse(open(refProteinFile,'rU'),'fasta')
+    output = open(outputFile,'w')
+    for item in res:
+        name = item.description
+        if organism in name:
+            SeqIO.write(item,output,'fasta')
+    output.close()
+
+extractRefseqPr('/home/shangzhong/refseq/refseq68_human.faa','/home/shangzhong/refseq/ref.protein.faa','Homo sapiens')
