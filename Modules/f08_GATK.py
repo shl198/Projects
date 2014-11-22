@@ -272,7 +272,7 @@ def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference):
         vcf = recal[:-9] + 'vcf'
         vcf_files.append(vcf)
         cmd = cmd + ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
-        '-I {input} -recoverDanglingHeads -dontUseSoftClippedBases ' 
+        '-I {input} -dontUseSoftClippedBases ' 
         '-stand_call_conf 20.0 -stand_emit_conf 20.0 -o {output} '
         '& ').format(
         gatk=gatk,ref_fa=reference,input=recal,output=vcf)
