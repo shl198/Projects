@@ -70,8 +70,8 @@ def addReadGroup(picard,sortBamFiles,readgroups):
 
 def sam2fastq(picard,samFiles,endType):
     """
-    samFiles is a list of sam/bam files
-    Type is single end or paired end
+    * samFiles is a list of sam/bam files
+    * Type: 'single' or 'pair'
     """
     fqs = []
     cmd = ''
@@ -95,3 +95,4 @@ def sam2fastq(picard,samFiles,endType):
             cmd = cmd + sam2fqCmd + ' & '
     subprocess.call(cmd[:-3],shell=True)
     return fqs
+
