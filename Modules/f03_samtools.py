@@ -28,11 +28,11 @@ def sam2bam_sort(samfiles,thread=1):
         # remove unsorted bam file
         rmBamCmd = rmBamCmd + 'rm {bam} & '.format(bam=bam)
         
-    subprocess.call(sam2bamCmd[:-3],shell=True)    
-    subprocess.call(rmSamCmd[:-3],shell=True)
-    subprocess.call(sortBamCmd[:-3],shell=True)
-    subprocess.call(indexCmd[:-3],shell=True)
-    subprocess.call(rmBamCmd[:-3],shell=True)
+    subprocess.check_call(sam2bamCmd[:-3],shell=True)    
+    subprocess.check_call(rmSamCmd[:-3],shell=True)
+    subprocess.check_call(sortBamCmd[:-3],shell=True)
+    subprocess.check_call(indexCmd[:-3],shell=True)
+    subprocess.check_call(rmBamCmd[:-3],shell=True)
     return sorted_files
  
 def bam2sam(bamfiles):
@@ -46,7 +46,7 @@ def bam2sam(bamfiles):
         samFiles.append(samfile)
         # command
         cmd = cmd + 'samtools view {bam} > {sam} & '.format(bam=bam,sam=samfile)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     
     return samFiles
 #===========================================================================
@@ -64,7 +64,7 @@ def extract_mapped(map_result):
         filename = mapfile[:-9] + '.mapped.sort.bam'
         returnFile.append(filename)
         cmd = cmd + 'samtools view -F 4 -bh {input} > {output} & '.format(input=mapfile,output=filename)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     
     return returnFile
 
@@ -74,7 +74,7 @@ def merge_bam(bamfiles,outputbam):
     """
     bam = ' '.join(bamfiles)
     cmd = ('samtools merge -f {output} {input}').format(output=outputbam,input=bam)
-    subprocess.call(cmd,shell=True)
+    subprocess.check_call(cmd,shell=True)
     
     
 def index_bam(bamFiles):
@@ -84,7 +84,7 @@ def index_bam(bamFiles):
     cmd = ''
     for bam in bamFiles:
         cmd = cmd + 'samtools index {bam} & '.format(bam=bam)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     print 'done'
     
     

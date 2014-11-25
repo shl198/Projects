@@ -65,5 +65,5 @@ def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file=''):
                 adaptCmd = ''
             trimCmd2nd = 'SLIDINGWINDOW:5:10 LEADING:15 TRAILING:10 MINLEN:36 TOPHRED33 & '
             cmd = cmd + trimCmd1st + adaptCmd + trimCmd2nd
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     return trimmedFiles

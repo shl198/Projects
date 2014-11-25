@@ -1,4 +1,4 @@
-import subprocess
+import subprocess,os
 
 def read_group(ID,sample,platform,library,platunit):
     return ('@RG\\tID:'+ID+'\\tSM:'+sample+'\\tPL:'+platform+'\\tLB:'+library
@@ -16,7 +16,7 @@ def sam2sortbam(picard,samfiles):
         cmd = ('java -jar {SortSam} INPUT={input} OUTPUT={output} '
                'SORT_ORDER=coordinate').format(SortSam=SortSam,
                 input=sam,output=sort_bam)
-        subprocess.call(cmd,shell=True)
+        subprocess.check_call(cmd,shell=True)
     return sorted_files
 
 def markduplicates(picard,sortBams):
@@ -34,7 +34,7 @@ def markduplicates(picard,sortBams):
         'MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 '
         'VALIDATION_STRINGENCY=LENIENT && ').format(mark=mark,input=bam,
         output=dedup)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     return dedup_files
 
 def addReadGroup(picard,sortBamFiles,readgroups):
@@ -57,14 +57,15 @@ def addReadGroup(picard,sortBamFiles,readgroups):
                      'RGID={ID} RGSM={SM} RGPL={PL} RGLB={LB} RGPU={PU} & ').format(
                     addGp=add,input=sam,sortbam=sortbam,ID=ID,SM=SM,PL=PL,LB=LB,
                     PU=PU)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     # the file name in sortBams is filename.sort.sort.bam, need to change to filename.sort.bam
     final_sort_bams = []
     for bam in sortBams:
         finalSortBam = bam[:-13] + 'sort.bam'
         final_sort_bams.append(finalSortBam)
+        os.remove(finalSortBam)
         renameCmd = ('mv {sortBam} {finalSortBam}').format(sortBam=bam,finalSortBam=finalSortBam)
-        subprocess.call(renameCmd,shell=True)
+        subprocess.check_call(renameCmd,shell=True)
     
     return final_sort_bams
 
@@ -93,6 +94,6 @@ def sam2fastq(picard,samFiles,endType):
                          'VALIDATION_STRINGENCY=LENIENT').format(
                         sam2fq=sam2fq,input=sam,fq=fq)
             cmd = cmd + sam2fqCmd + ' & '
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     return fqs
 

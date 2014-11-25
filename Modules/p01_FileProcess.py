@@ -1,4 +1,6 @@
 import subprocess
+import sys
+import os
 from f03_samtools import merge_bam
 def remove(files):
     """
@@ -8,13 +10,19 @@ def remove(files):
     files: a list of files to be removed. [f1,f2,f3,...]
     """
     if isinstance(files,str):
-        subprocess.call('rm {file}'.format(file=files),shell=True)
+        try:
+            os.remove(files)
+        except:
+            print files, 'does not exist'
+            sys.exit(1)
     if isinstance(files,list):
-        cmd = ''
         for f in files:
-            cmd = cmd + ('rm {file} & ').format(file=f)
-        subprocess.call(cmd[:-3],shell=True)
-    
+            try:
+                os.remove(f)
+            except:
+                print f, 'does not exist'
+                sys.exit(1)
+
 
 def get_parameters(parFile):
     """
@@ -65,9 +73,9 @@ def rg_bams(rgs,bamfiles):
         output = sample + '.merged.sort.bam'
         merged.append(output)
         if len(readic[sample]) == 1:
-            renameCmd = ('mv {before} {after}').format(
+            renameCmd = ('cp {before} {after}').format(
                     before=readic[sample][0],after=output)
-            subprocess.call(renameCmd,shell=True)
+            subprocess.check_call(renameCmd,shell=True)
         else:
             merge_bam(readic[sample],output)
     return merged
@@ -85,7 +93,7 @@ def changeFastqReadName(fastqFiles):
         renameCmd = ('gunzip -c {fq} | fastx_renamer -n COUNT '
                      '-z -o {output}').format(fq=fq[0],output=output)
         cmd = cmd + renameCmd + ' & '
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
 
 
     

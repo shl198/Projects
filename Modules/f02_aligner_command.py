@@ -45,7 +45,7 @@ def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
                             '-N 1 -s {annotation} {fastq} --force-xs-dir > {output} && ').format(db_path=db_path
                             ,db_name=db_name,thread=thread,annotation=annotation,
                             fastq=fastq[0],output=output)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     return map_result
 
 #=========  bowtie2 alignment  ========================= 
@@ -66,7 +66,7 @@ def bowtie2(fastqFiles,database,thread=1):
             cmd = cmd + ('bowtie2 -x {database} -p {thread} -U {fastq} '
                          '-S {outputfile} && ').format(database=database,
                         thread = thread, fastq = fastq[0], outputfile=output)
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     return map_result
 #============  Tophat Alignment  =======================            
 def tophat(fastqFiles,database,annotation,thread=1):
@@ -90,7 +90,7 @@ def tophat(fastqFiles,database,annotation,thread=1):
             cmd = cmd + ('tophat -p {thread} -G {gff} --b2-very-sensitive -o {output} '
             '{reference} {fastq} && ').format(thread = thread, gff = annotation, 
             output = output,reference = database, fastq = fastq[0])
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     return map_result
 
 #============  Blast Alignment  ===========================
@@ -106,7 +106,7 @@ def blastn(faFiles,database,thread = 1):
                   '-db {db} -evalue 1e-10 -word_size 10 -outfmt 6 '
                   '-num_alignments 1 -num_threads {thread} ').format(
                   input=fa,output=output,db=database,thread=thread)
-        subprocess.call(blastn,shell=True)
+        subprocess.check_call(blastn,shell=True)
     return map_result
 #============ bwa alignment  ===============================
 def bwa_vari(readgroup,fqFiles,database,thread=1):
@@ -130,7 +130,7 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
             bwaCmd = bwaCmd + ('bwa mem -t {thread} -M -R {readgroup} '
                        '{database} {fq} > {output} && ').format(thread=thread,
                         readgroup=rg,database=database,fq=fastq[0])
-    subprocess.call(bwaCmd[:-3],shell=True)
+    subprocess.check_call(bwaCmd[:-3],shell=True)
     return map_result        
 #============  STAR alignment  ===============================
 def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
@@ -145,7 +145,7 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
         if annotation != '':
             cmd = cmd + ('--sjdbGTFfile {gff3} --sjdbGTFtagExonParentTranscript Parent '
                          '--sjdbOverhang 100').format(gff3=annotation)
-    subprocess.call(cmd,shell=True)
+    subprocess.check_call(cmd,shell=True)
     
 def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):
     """
@@ -180,14 +180,14 @@ def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):
                         ref=db_path,fq1=fastq[0],
                         thread=thread,output=output)
             cmd = cmd + starCmd + ' ' + ' '.join(otherParameters) + ' && '
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd[:-3],shell=True)
     final_name = []
     for sam in map_results:
         new_name = sam[:-15] + 'sam'
         rename = ('mv {star_result} {modified_name}').format(star_result=sam,
                   modified_name=new_name)
         final_name.append(new_name)
-        subprocess.call(rename,shell=True)
+        subprocess.check_call(rename,shell=True)
     return final_name
 
 #============  STAR 2 pass alignment  ===============================
@@ -195,7 +195,7 @@ def STAR2Pass(fastqFiles,starDb,ref_fa,thread=1):
     # this function run 2 pass of mapping
     map_sams = STAR(fastqFiles,starDb,thread)
     if not os.path.exists("starDb2Pass"):
-        subprocess.call('mkdir starDb2Pass',shell=True)
+        subprocess.check_call('mkdir starDb2Pass',shell=True)
     for sam,fastq in zip(map_sams,fastqFiles):
         SJFile = sam[:-3] + 'SJ.out.tab'
         cmd = ('STAR --runMode genomeGenerate --genomeDir starDb2Pass '
@@ -203,8 +203,8 @@ def STAR2Pass(fastqFiles,starDb,ref_fa,thread=1):
                '--sjdbOverhang 100 --runThreadN {thread} '
                '--limitGenomeGenerateRAM 310000000000').format(
                 ref_fa=ref_fa,SJ=SJFile,thread=thread)
-        subprocess.call(cmd,shell=True)
+        subprocess.check_call(cmd,shell=True)
         result = STAR([fastq],'starDb2Pass',thread)
-    subprocess.call('rm -r starDb2Pass',shell=True)
+    subprocess.check_call('rm -r starDb2Pass',shell=True)
     return map_sams
 
