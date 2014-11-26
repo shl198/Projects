@@ -36,6 +36,8 @@ def extract_protein_ID_map(blastFile,topNum = 1,switch='False'):
     * blastFiles: blast filename
     
     * topNum: an integer indicates how many top hits you want. default is 1
+    
+    return file with 2 columns of protein IDs.
     """
     id_map = [[]] * 2
     i = 0 # number of tophits

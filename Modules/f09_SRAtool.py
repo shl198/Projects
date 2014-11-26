@@ -16,4 +16,4 @@ def sra2fastq(sraFiles):
     for sra in sraFiles:
         sraCmd = ('fastq-dump --split-files --gzip {sra}').format(sra=sra)
         cmd = cmd + sraCmd + ' & '
-    subprocess.call(cmd[:-3],shell=True)
+    subprocess.call(cmd + 'wait',shell=True)

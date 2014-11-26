@@ -33,7 +33,7 @@ def IndelRealigner(gatk,dedupbams,reference,intervals):
                '-I {input} -targetIntervals {target} '
                '-o {output} & ').format(gatk=gatk,ref_fa=reference,
                 input=dedupbam,target=interval,output=realign)
-    subprocess.check_call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd + 'wait',shell=True)
     return realigned_files
 
 def HaplotypeCaller_DNA_VCF(gatk,recal_files,reference,thread):
@@ -66,7 +66,7 @@ def HaplotypeCaller_DNA_gVCF(gatk,recal_files,reference,thread):
                '--variant_index_type LINEAR --variant_index_parameter 128000 ' 
                '-o {output} & ').format(gatk=gatk,
                 ref_fa=reference,input=recal,output=vcf)
-    subprocess.check_call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd + 'wait',shell=True)
     return vcf_files
 
 def JointGenotype(gatk,gvcf_files,reference,samplename,thread):
@@ -276,7 +276,7 @@ def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference):
         '-stand_call_conf 20.0 -stand_emit_conf 20.0 -o {output} '
         '& ').format(
         gatk=gatk,ref_fa=reference,input=recal,output=vcf)
-    subprocess.check_call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd + 'wait',shell=True)
     return vcf_files
 
 def RNA_Vari_Filter(gatk,vcfs,ref_fa):

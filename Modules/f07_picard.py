@@ -45,7 +45,7 @@ def addReadGroup(picard,sortBamFiles,readgroups):
     sortBams = []
     cmd = ''
     for sam,rg in zip(sortBamFiles,readgroups):
-        sortbam = sam[:-3] + 'sort.bam'
+        sortbam = sam[:-3] + 'adrg.bam'
         sortBams.append(sortbam)
         readgroup = rg.split('\\t')
         ID = readgroup[1][3:-1]
@@ -57,17 +57,17 @@ def addReadGroup(picard,sortBamFiles,readgroups):
                      'RGID={ID} RGSM={SM} RGPL={PL} RGLB={LB} RGPU={PU} & ').format(
                     addGp=add,input=sam,sortbam=sortbam,ID=ID,SM=SM,PL=PL,LB=LB,
                     PU=PU)
-    subprocess.check_call(cmd[:-3],shell=True)
-    # the file name in sortBams is filename.sort.sort.bam, need to change to filename.sort.bam
-    final_sort_bams = []
-    for bam in sortBams:
-        finalSortBam = bam[:-13] + 'sort.bam'
-        final_sort_bams.append(finalSortBam)
-        os.remove(finalSortBam)
-        renameCmd = ('mv {sortBam} {finalSortBam}').format(sortBam=bam,finalSortBam=finalSortBam)
-        subprocess.check_call(renameCmd,shell=True)
-    
-    return final_sort_bams
+    subprocess.check_call(cmd + 'wait',shell=True)
+#     # the file name in sortBams is filename.sort.sort.bam, need to change to filename.sort.bam
+#     final_sort_bams = []
+#     for bam in sortBams:
+#         finalSortBam = bam[:-13] + 'sort.bam'
+#         final_sort_bams.append(finalSortBam)
+#         os.remove(finalSortBam)
+#         renameCmd = ('mv {sortBam} {finalSortBam}').format(sortBam=bam,finalSortBam=finalSortBam)
+#         subprocess.check_call(renameCmd,shell=True)
+#     
+    return sortBams
 
 def sam2fastq(picard,samFiles,endType):
     """
@@ -94,6 +94,6 @@ def sam2fastq(picard,samFiles,endType):
                          'VALIDATION_STRINGENCY=LENIENT').format(
                         sam2fq=sam2fq,input=sam,fq=fq)
             cmd = cmd + sam2fqCmd + ' & '
-    subprocess.check_call(cmd[:-3],shell=True)
+    subprocess.check_call(cmd + 'wait',shell=True)
     return fqs
 
