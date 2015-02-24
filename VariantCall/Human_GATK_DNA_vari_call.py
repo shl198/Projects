@@ -5,7 +5,7 @@ this file does variant calling for DNAseq
 import os
 import sys,subprocess
 sys.path.append('/home/shangzhong/Codes/Pipeline')
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer so that in the log file all information is printed in order.
 from Modules.f00_Message import Message
 from Modules.f01_list_trim_fq import list_files,Trimmomatic
 from Modules.f02_aligner_command import bwa_vari
@@ -19,7 +19,7 @@ from Modules.p01_FileProcess import remove,get_parameters,rg_bams
    running pipeline
 """
 
-#parFile = '/data/shangzhong/VariantCall/pgsaDNA_VS_chok1/DNA_Parameters.txt'
+#parFile = '/data/shangzhong/VariantCall/Human_Test/Human_DNA_parameters.txt'
 parFile = sys.argv[1]
 param = get_parameters(parFile)
 thread = param['thread']
@@ -34,6 +34,11 @@ trim = param['trim']
 phred = param['phred']
 picard = param['picard']
 trimmomatic = param['trimmomatic']
+gold_snp = param['dbSNP']
+phaseINDEL= param['phase1INDEL']
+gold_indel= param['MillINDEL']
+omni = param['omni']
+hapmap = param['hapMap']
 
 gatk = param['gatk']
 read_group = param['readGroup']
@@ -45,7 +50,6 @@ organism = param['organism']
 os.chdir(file_path)
 Message(startMessage,email)
 #========  (1) read files  ================================
-"""
 fastqFiles = list_files(file_path)
 if trim == 'True':
     fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)
@@ -81,19 +85,20 @@ except:
     print 'mark duplicates failed'
     Message('mark duplicates failed',email)
     sys.exit(1)
+    
 #========  2. Indel realignment  ====================================
-#========  (1) Create a target list of intervals===========
+#========  (6) Create a target list of intervals===========
 try:
-    interval = RealignerTargetCreator(gatk,dedup_files,ref_fa,thread)
+    interval = RealignerTargetCreator(gatk,dedup_files,ref_fa,thread,phaseINDEL,gold_indel)
     print 'RealignerTarget Creator succeed'
     print 'interval is: ',interval
 except:
     print 'RealignerTarget Creator failed'
     Message('RealignerTarget Creator failed',email)
     sys.exit(1)
-#========  (2) realignment of target intervals ============
+#========  (7) realignment of target intervals ============
 try:
-    realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval)
+    realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval,phaseINDEL,gold_indel)
     print 'IndexRealigner succeed'
     print 'realign_bams is: ',realign_bams
     remove(dedup_files)
@@ -102,100 +107,25 @@ except:
     Message('IndelRealigner failed',email)
     sys.exit(1)
 #========  3. Base quality recalibration  =================
-
-# since we don't have dbsnp for CHO, we need to:
-# 1. find snp without recalibration, got vcf file
-# 2. extract the snps we think are real snps, into a real_vcf file.
-# 3. use the file in 2 to do the recalibration.
-
-##=================  Part II. Variant Calling  ======================
-#========  1. call raw variant using HaplotypeCaller  =====
-#========  (1) determine parameters  ======================
-#========  (2) call variant  ==============================
-roundNum = 1
+roundNum = '1'
 try:
-    raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
-    print 'round 1 call succeed'
-    print 'raw_gvcf_files is: ',raw_gvcf_files
-except:
-    print 'round 1 call failed'
-    Message('round 1 call failed',email)
-    sys.exit(1)
-#========  (3) Joint Genotyping ===========================
-try:
-    joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism,thread)
-    print 'round 1 join vcf succeed'
-    print 'joint_gvcf_file is: ',joint_gvcf_file
-except:
-    print 'round 1 join vcf failed'
-    Message('round 1 join vcf failed',email)
-    sys.exit(1)
-#*********** since we don't have the dbsnp for CHO, we need to repeat 
-#*********** base reaclibration until it converge.
-#========  (4) Variant hard filter  =======================
-try:
-    gold_files = HardFilter(gatk,joint_gvcf_file,ref_fa,thread)
-    print 'round 1 gold files succeed'
-    print 'gold_files is: ',gold_files
-except:
-    print 'round 1 gold files failed'
-    Message('round 1 gold files failed',email)
-    sys.exit(1)
-#========  (5) Base Recalibration  ========================
-try:
-    recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
-                                           gold_files[1],roundNum,thread)
+    recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_snp,
+                                           gold_indel,roundNum,thread)
     print 'round 1 recalibration succeed'
     print 'recal_bam_files is: ',recal_bam_files
 except:
     print 'round 1 recalibration failed'
     Message('round 1 recalibration failed',email)
     sys.exit(1)
-#======== second round ====================================
-roundNum = 2
-try:
-    raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,recal_bam_files,ref_fa,thread)
-    print 'round 2 call succeed'
-    print 'raw_gvcf_files is:',raw_gvcf_files
-except:
-    print 'round 2 call failed'
-    Message('round 2 call failed',email)
-    sys.exit(1)
-#------- Joint Genotyping --------
-try:
-    joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism,thread)
-    print 'round 2 join vcf succeed'
-    print 'joint_gvcf_file is: ',joint_gvcf_file
-except:
-    print 'round 2 join vcf failed'
-    Message('round 2 join vcf failed',email)
-    sys.exit(1)
-#------- Hard filter -------------
-try:
-    gold_files = HardFilter(gatk,joint_gvcf_file,ref_fa,thread)
-    print 'round 2 gold files succeed'
-    print 'gold_files is: ',gold_files
-except:
-    print 'round 2 gold files failed'
-    Message('round 2 gold files failed',email)
-    sys.exit(1)
-#------- Recalibration -----------
-try:
-    recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
-                                           gold_files[1],roundNum,thread)
-    print 'round 2 recalibration succeed'
-    print 'recal_bam_files is: ',recal_bam_files
-except:
-    print 'round 2 recalibration failed'
-    Message('round 2 recalibration failed',email)
-    sys.exit(1)
-"""
 
-recal_bam_files = ['trim_4_130918_AC2D94ACXX_P674_101_dual78_1.recal.bam']
+##=================  Part II. Variant Calling  ======================
+#========  1. call raw variant using HaplotypeCaller  =====
+#========  (1) determine parameters  ======================
+#========  (2) call variant  ==============================
 
 #========  !!! merge lanes for the same sample ============
 if len(recal_bam_files) !=1:
-    #========= merge samples  =========================
+    #========= (3) merge samples  =========================
     try:
         merged_bams = rg_bams(read_group,recal_bam_files)
         print 'merged succeed'
@@ -205,7 +135,7 @@ if len(recal_bam_files) !=1:
         print 'merged failed'
         Message('merged failed',email)
         sys.exit(1)
-    #========= mark duplicates ========================
+    #========= (4) mark duplicates ========================
     try:
         dedup_files = markduplicates(picard,merged_bams)
         print 'dedup succeed'
@@ -215,10 +145,12 @@ if len(recal_bam_files) !=1:
         print 'merged dedup failed'
         Message('merged dedup failed',email)
         sys.exit(1)
-    #========= Realignment ============================
+    #========= (5) Realignment ============================
     try:
-        interval = RealignerTargetCreator(gatk,dedup_files,ref_fa,thread)
-        realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval)
+        interval = RealignerTargetCreator(gatk,dedup_files,ref_fa,
+                                          thread,phaseINDEL,gold_indel)
+        realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,
+                                      interval,phaseINDEL,gold_indel)
         print 'merged indelrealigner succeed'
         print 'merged realign_bams is: ',realign_bams
         remove(dedup_files)
@@ -226,7 +158,7 @@ if len(recal_bam_files) !=1:
         print 'merged realign failed'
         Message('merged realign failed',email)
         sys.exit(1)
-    #========  (6) call variant  ==============================
+    #=========  (6) call variant  ==============================
     try:
         raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
         print 'merged final call succeed'
@@ -235,7 +167,7 @@ if len(recal_bam_files) !=1:
         print 'final call failed'
         Message('final call failed',email)
         sys.exit(1)
-    #========  (7) Joint Genotyping ===========================
+    #========  (7) Joint Genotyping  ==========================
     try:
         joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism,thread)
         print 'final joint succeed'
@@ -244,35 +176,35 @@ if len(recal_bam_files) !=1:
         print 'final joint failed'
         Message('final joint failed',email)
         sys.exit(1)
-else:
-    # for only one file, just run calling with recalibration bam file
+    #========  (8) VQSR  ======================================
     try:
-        joint_gvcf_file = HaplotypeCaller_DNA_VCF(gatk,recal_bam_files,ref_fa,thread) 
-        print 'final call succeed'
-        print 'raw_gvcf_files is:',joint_gvcf_file
+        recal_variant = VQSR_human(gatk,joint_gvcf_file,ref_fa,thread,hapmap,omni,phaseINDEL,gold_snp,gold_indel)
+        print 'vcf recalibration succeed'
+        print 'recal_variant is: ',recal_variant
     except:
-        print 'final call failed'
-        Message('final call failed',email)
+        print 'final vcf recalibration failed'
+        Message('final vcf recalibration failed',email)
         sys.exit(1)
-
-#========  (8) VQSR or Hard filter  ======================================
-# since CHO samples we have don't have enough samples and snp resources, the VQSR step cannot give a very good prediction.
-# we choose to use hardFilter.
-try:
-    final_filtered_files = HardFilter(gatk,joint_gvcf_file,ref_fa,thread)
-    print 'final filter succeed'
-    print 'final_filtered_files is: ',final_filtered_files
-except:
-    print 'final filter failed'
-    Message('final filter failed',email)
-    sys.exit(1)
-# try:
-#     recal_variant = VQSR(gatk,joint_gvcf_file,gold_files[0],gold_files[1],ref_fa,thread)
-#     print 'vcf recalibration succeed'
-#     print 'recal_variant is: ',recal_variant
-# except:
-#     print 'final vcf recalibration failed'
-#     Message('final vcf recalibration failed',email)
-#     sys.exit(1)
+else:
+    
+    # for only one file, just run calling with recalibration bam file
+    #======== Calling variant =================================
+    try:
+        raw_gvcf_files = HaplotypeCaller_DNA_VCF(gatk,recal_bam_files,ref_fa,thread)  
+        print 'final call succeed'
+        print 'raw_gvcf_files is:',raw_gvcf_files
+    except:
+        print 'final call succeed'
+        Message('final call succeed',email)
+        sys.exit(1)
+    #======== Hard filtering ==================================
+    try:
+        final_filtered_files = HardFilter(joint_gvcf_file,ref_fa)
+        print 'final filter succeed'
+        print 'final_filtered_files is: ',final_filtered_files
+    except:
+        print 'final filter failed'
+        Message('final filter failed',email)
+        sys.exit(1)
+        
 Message(endMessage,email)
-##=================  Part III. Analyze Variant  =====================
