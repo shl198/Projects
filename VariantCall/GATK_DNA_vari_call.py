@@ -45,7 +45,7 @@ organism = param['organism']
 os.chdir(file_path)
 Message(startMessage,email)
 #========  (1) read files  ================================
-"""
+
 fastqFiles = list_files(file_path)
 if trim == 'True':
     fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)
@@ -71,6 +71,7 @@ except:
     print 'sort bam files failed'
     Message('sort bam files failed',email)
     sys.exit(1)
+
 #========  (5) Markduplicates using picard ================
 try:
     dedup_files = markduplicates(picard,sort_bams)
@@ -102,7 +103,6 @@ except:
     Message('IndelRealigner failed',email)
     sys.exit(1)
 #========  3. Base quality recalibration  =================
-
 # since we don't have dbsnp for CHO, we need to:
 # 1. find snp without recalibration, got vcf file
 # 2. extract the snps we think are real snps, into a real_vcf file.
@@ -189,10 +189,6 @@ except:
     print 'round 2 recalibration failed'
     Message('round 2 recalibration failed',email)
     sys.exit(1)
-"""
-
-recal_bam_files = ['trim_4_130918_AC2D94ACXX_P674_101_dual78_1.recal.bam']
-
 #========  !!! merge lanes for the same sample ============
 if len(recal_bam_files) !=1:
     #========= merge samples  =========================
@@ -247,7 +243,7 @@ if len(recal_bam_files) !=1:
 else:
     # for only one file, just run calling with recalibration bam file
     try:
-        joint_gvcf_file = HaplotypeCaller_DNA_VCF(gatk,recal_bam_files,ref_fa,thread) 
+        joint_gvcf_file = HaplotypeCaller_DNA_VCF(gatk,recal_bam_files[0],ref_fa,thread) 
         print 'final call succeed'
         print 'raw_gvcf_files is:',joint_gvcf_file
     except:
@@ -266,6 +262,7 @@ except:
     print 'final filter failed'
     Message('final filter failed',email)
     sys.exit(1)
+
 # try:
 #     recal_variant = VQSR(gatk,joint_gvcf_file,gold_files[0],gold_files[1],ref_fa,thread)
 #     print 'vcf recalibration succeed'
@@ -274,5 +271,13 @@ except:
 #     print 'final vcf recalibration failed'
 #     Message('final vcf recalibration failed',email)
 #     sys.exit(1)
+#========  (9) combine snp and indel ======================================
+try:
+    combinedVcf = CombineSNPandINDEL(gatk,ref_fa,final_filtered_files,'--assumeIdenticalSamples --genotypemergeoption UNSORTED')
+    print 'combine snp and indel succeed'
+    print 'combineVcf file is: ',combinedVcf
+except:
+    print 'combine snp and indel failed'
+    sys.exit(1)
 Message(endMessage,email)
 ##=================  Part III. Analyze Variant  =====================

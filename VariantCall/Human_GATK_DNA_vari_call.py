@@ -4,10 +4,9 @@ this file does variant calling for DNAseq
 #=============  import required packages  =================
 import os
 import sys,subprocess
-sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer so that in the log file all information is printed in order.
 from Modules.f00_Message import Message
-from Modules.f01_list_trim_fq import list_files,Trimmomatic
+from Modules.f01_list_trim_fq import list_files_human,Trimmomatic
 from Modules.f02_aligner_command import bwa_vari
 from Modules.f03_samtools import sam2bam_sort
 from Modules.f07_picard import markduplicates
@@ -19,7 +18,6 @@ from Modules.p01_FileProcess import remove,get_parameters,rg_bams
    running pipeline
 """
 
-#parFile = '/data/shangzhong/VariantCall/Human_Test/Human_DNA_parameters.txt'
 parFile = sys.argv[1]
 param = get_parameters(parFile)
 thread = param['thread']
@@ -34,6 +32,7 @@ trim = param['trim']
 phred = param['phred']
 picard = param['picard']
 trimmomatic = param['trimmomatic']
+trimmoAdapter = param['trimmoAdapter']
 gold_snp = param['dbSNP']
 phaseINDEL= param['phase1INDEL']
 gold_indel= param['MillINDEL']
@@ -49,10 +48,11 @@ organism = param['organism']
 #========  (0) enter the directory ========================
 os.chdir(file_path)
 Message(startMessage,email)
+
 #========  (1) read files  ================================
-fastqFiles = list_files(file_path)
+fastqFiles = list_files_human(file_path)
 if trim == 'True':
-    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)
+    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter)
 print 'list file succeed'
 print 'fastqFiles is: ',fastqFiles
 #========  (2) define group ===============================
@@ -85,7 +85,6 @@ except:
     print 'mark duplicates failed'
     Message('mark duplicates failed',email)
     sys.exit(1)
-    
 #========  2. Indel realignment  ====================================
 #========  (6) Create a target list of intervals===========
 try:
@@ -122,7 +121,6 @@ except:
 #========  1. call raw variant using HaplotypeCaller  =====
 #========  (1) determine parameters  ======================
 #========  (2) call variant  ==============================
-
 #========  !!! merge lanes for the same sample ============
 if len(recal_bam_files) !=1:
     #========= (3) merge samples  =========================
@@ -190,21 +188,29 @@ else:
     # for only one file, just run calling with recalibration bam file
     #======== Calling variant =================================
     try:
-        raw_gvcf_files = HaplotypeCaller_DNA_VCF(gatk,recal_bam_files,ref_fa,thread)  
+        raw_vcf_file = HaplotypeCaller_DNA_VCF(gatk,recal_bam_files[0],ref_fa,thread)  
         print 'final call succeed'
-        print 'raw_gvcf_files is:',raw_gvcf_files
+        print 'raw_gvcf_files is:',raw_vcf_file
     except:
-        print 'final call succeed'
-        Message('final call succeed',email)
+        print 'final call failed'
+        Message('final call failed',email)
         sys.exit(1)
-    #======== Hard filtering ==================================
+#======== Hard filtering ==================================
     try:
-        final_filtered_files = HardFilter(joint_gvcf_file,ref_fa)
+        final_filtered_files = HardFilter(gatk,raw_vcf_file,ref_fa,thread)
         print 'final filter succeed'
         print 'final_filtered_files is: ',final_filtered_files
     except:
         print 'final filter failed'
         Message('final filter failed',email)
         sys.exit(1)
-        
+    #======== Combine snp and indel ===========================
+    try:
+        combinedVcf = CombineSNPandINDEL(gatk,ref_fa,final_filtered_files,'--assumeIdenticalSamples --genotypemergeoption UNSORTED')
+        print 'combine snp and indel succeed'
+        print 'combineVcf file is: ',combinedVcf
+    except:
+        print 'combine snp and indel failed'
+        sys.exit(1)
+
 Message(endMessage,email)

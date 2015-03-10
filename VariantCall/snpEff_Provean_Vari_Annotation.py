@@ -6,8 +6,8 @@ from Modules.f11_snpEff_provean import *
 from Modules.p01_FileProcess import get_parameters
 from Modules.f00_Message import Message
 
-parFile = sys.argv[1]
-#parFile = '/data/shangzhong/VariantCall/CHOS_ToT_VS_chok1/filteredVcfResults/CHOS_TOT_A8/test/Annotation_Parameters.txt'
+#parFile = sys.argv[1]
+parFile = '/data/shangzhong/VariantCall/pgsa_VS_chok1/filteredVcfResults/Annotation_Parameters.txt'
 param = get_parameters(parFile)
 # parameters
 thread = param['thread']
@@ -35,20 +35,24 @@ Message(startMessage,email)
 #        Variant analysis pipeline
 #===============================================================================
 ## read gene list
-genes = []
-geneFile = open(gene_file,'r')
-for line in geneFile:
-    if line[0].isalpha():
-        genes.append(line[:-1])
-geneFile.close()
-genes = list(set(genes))
-genes.sort()
+if gene_file == '':
+    genes = ['']
+else:
+    genes = []
+    geneFile = open(gene_file,'r')
+    for line in geneFile:
+        if line[0].isalpha():
+            genes.append(line[:-1])
+    geneFile.close()
+    genes = list(set(genes))
+    genes.sort()
 #================= 0. list directories =========================================
 os.chdir(pathway) # set work directory
 folders = [f for f in listdir(pathway) if os.path.isdir(os.path.join(pathway, f))]
 print 'list directories succeeds'
 print 'folders are:',folders
 
+# support set for provean, it can help proven skip the time consuming blast step
 support_set = [f for f in os.listdir(support_set_path) if f.endswith('.sss')]
 for folder in folders:
     workdir = pathway + '/' + folder
@@ -58,25 +62,32 @@ for folder in folders:
     proteinFiles = [];variantFiles = []
     #============= 1. Annotate vcf results using snpEff ================
     annotatedVCF = snpEff_annotateVCF(vcfFile,snpEff,genome)  # annotated: filename.eff.vcf
-    #cmd = ('sed -i \'s/{original}/{new}/g\' {file}').format(original='5_prime_UTR_truncation+',
-    #                                                        new='5_prime_UTR_truncation\&',file=annotatedVCF)
-    #subprocess.call(cmd,shell=True)
-    #============= Loop for every genes ================================
+    #============= 2. Loop for every genes ================================
     for gene in genes:
         print gene,'start to get input files for provean'
-        gene_if = ('(ANN[*].GENE=\'{gene}\')').format(gene=gene)
-        #============= 2. Filter the annotated file ========================
-        try:
-            filteredVCF = snpSift_filterVCF(annotatedVCF,snpSift,[gene_if,'&'
-                        '((ANN[*].IMPACT=\'HIGH\') | (ANN[*].IMPACT=\'MODERATE\'))'])
-        except:
-            print gene,'snpSift filter failed'
-            Message('snpSift filter failed',email)
-        #============= 3. Get input files for provean ======================
+        if gene == '':
+            try:
+                filteredVCF = snpSift_filterVCF(annotatedVCF,snpSift,
+                            ['((ANN[*].IMPACT=\'HIGH\') | (ANN[*].IMPACT=\'MODERATE\'))'])
+            except:
+                print gene,'snpSift filter failed'
+                Message('snpSift filter failed',email)
+        else:
+            gene_if = ('(ANN[*].GENE=\'{gene}\')').format(gene=gene)
+            #============= (1). Filter the annotated file ========================
+            try:
+                filteredVCF = snpSift_filterVCF(annotatedVCF,snpSift,[gene_if,'&'
+                            '((ANN[*].IMPACT=\'HIGH\') | (ANN[*].IMPACT=\'MODERATE\'))'])
+                print 'filteredVCF is: ',filteredVCF
+            except:
+                print gene,'snpSift filter failed'
+                Message('snpSift filter failed',email)
+        #============= (2). Get input files for provean ======================
         try:
             [protein_files,variant_files] = vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile)
         except:
             print gene,'fail to get provean inputs'
+            Message('fail to get provean inputs',email)
             sys.exit(1)
         if protein_files != '':
             proteinFiles.extend(protein_files)
@@ -85,7 +96,9 @@ for folder in folders:
         else:
             print gene,'does not have interested variants'
             sys.exit(1)
-    #============= 4. Run provean ======================================
+    #============= 3. Run provean ======================================
+#     proteinFiles = [f for f in listdir(workdir) if f.endswith('protein.fa')]
+#     variantFiles = [f for f in listdir(workdir) if f.endswith('variant.txt')]
     provean_result = 'proveanScore.txt'
     #support_set = [f for f in os.listdir(support_set_path) if f.endswith('.sss')]
     try:
