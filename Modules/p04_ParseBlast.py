@@ -1,6 +1,4 @@
 from p03_ParseSam import get_name
-from f05_IDConvert import extract_from_gene2ref,prIDMap2geneIDMap
-import subprocess,os
 
 def annotateBlast(blastFile,anno_type):
     """
@@ -28,10 +26,10 @@ def annotateBlast(blastFile,anno_type):
     output.close()
     
 
-def extract_protein_ID_map(blastFile,topNum = 1,switch='False'):
+def extract_blast_ID_map(blastFile,topNum = 1,switch='False'):
     """
     This function extracts the top prtein id mapping results from blast tabular 
-    files.
+    files. 
     
     * blastFiles: blast filename
     
@@ -57,9 +55,13 @@ def extract_protein_ID_map(blastFile,topNum = 1,switch='False'):
             i = i + 1
             # switch the column
             if switch == 'True':
-                output.write(ref_id + '\t' + query_id + '\n')
+                outline = ('{ref}\t{query}\t{iden}\t{len}\n').format(ref=ref_id,query=query_id,
+                                                                     iden=item[2],len=item[3])
+                output.write(outline)  # changed here
             else:
-                output.write(query_id + '\t' + ref_id + '\n')
+                outline = ('{query}\t{ref}\t{iden}\t{len}\n').format(ref=ref_id,query=query_id,
+                                                                     iden=item[2],len=item[3])
+                output.write(outline)
         # if both are equal
         elif (query_id == id_map[0] and ref_id == id_map[1]):
             continue
@@ -72,18 +74,26 @@ def extract_protein_ID_map(blastFile,topNum = 1,switch='False'):
                 id_map[0] = query_id
                 id_map[1] = ref_id
                 if switch == 'True':
-                    output.write(ref_id + '\t' + query_id + '\n')
+                    outline = ('{ref}\t{query}\t{iden}\t{len}\n').format(ref=ref_id,query=query_id,
+                                                                     iden=item[2],len=item[3])
+                    output.write(outline)
                 else:
-                    output.write(query_id + '\t' + ref_id + '\n')
+                    outline = ('{query}\t{ref}\t{iden}\t{len}\n').format(ref=ref_id,query=query_id,
+                                                                     iden=item[2],len=item[3])
+                    output.write(outline)
         # if first item don't equal
         else:
             i = 1
             id_map[0] = query_id
             id_map[1] = ref_id
             if switch == 'True':
-                output.write(ref_id + '\t' + query_id + '\n')
+                outline = ('{ref}\t{query}\t{iden}\t{len}\n').format(ref=ref_id,query=query_id,
+                                                                     iden=item[2],len=item[3])
+                output.write(outline)
             else:
-                output.write(query_id + '\t' + ref_id + '\n')
+                outline = ('{query}\t{ref}\t{iden}\t{len}\n').format(ref=ref_id,query=query_id,
+                                                                     iden=item[2],len=item[3])
+                output.write(outline)
     output.close()
     return outputFile
 

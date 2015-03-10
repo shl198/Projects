@@ -23,13 +23,15 @@ def markduplicates(picard,sortBams):
     """
     this function mark duplicates of the sorted bam file
     """
+    if not os.path.exists('tmp'): 
+        os.makedirs('tmp')
     mark = picard + '/' + 'MarkDuplicates.jar'
     dedup_files = []
     cmd = ''
     for bam in sortBams:
         dedup = bam[:-8] + 'dedup.bam'
         dedup_files.append(dedup)
-        cmd = cmd + ('java -jar {mark} I={input} O={output} CREATE_INDEX=true '
+        cmd = cmd + ('java -Djava.io.tmpdir=tmp -jar {mark} I={input} O={output} CREATE_INDEX=true '
         'METRICS_FILE=metrics.txt MAX_RECORDS_IN_RAM=8000000 '
         'MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 '
         'VALIDATION_STRINGENCY=LENIENT && ').format(mark=mark,input=bam,

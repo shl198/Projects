@@ -31,10 +31,10 @@ def get_parameters(parFile):
     
     parFiles: filename of the parmeter file.
     """
-    res = open(parFile)
+    res = open(parFile,'r')
     dic = {}
     for line in res:
-        if line[0].isalpha():
+        if line[0].isalpha(): # the first character is a letter
             item = line.split('\t')
             value = item[1] # combine all values into a single string
             if ',' in value:
@@ -45,8 +45,9 @@ def get_parameters(parFile):
                 dic[item[0]] = item[1][:-1]
         else:
             continue
-    if isinstance(dic['readGroup'],str):
-                dic['readGroup'] = [dic['readGroup'][:-1]]
+    if 'readGroup' in dic:
+        if isinstance(dic['readGroup'],str):
+                    dic['readGroup'] = [dic['readGroup'][:-1]]
     return dic
 
 def rg_bams(rgs,bamfiles):
@@ -96,5 +97,4 @@ def changeFastqReadName(fastqFiles):
     subprocess.check_call(cmd[:-3],shell=True)
 
 
-    
 

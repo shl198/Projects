@@ -64,4 +64,6 @@ def extractRefseqPr(outputFile,refProteinFile,organism):
             SeqIO.write(item,output,'fasta')
     output.close()
 
-extractRefseqPr('/home/shangzhong/refseq/refseq68_human.faa','/home/shangzhong/refseq/ref.protein.faa','Homo sapiens')
+# extractRefseqPr('/data/shangzhong/CHO2Human/mRNA/rna68_human.fna','/data/shangzhong/CHO2Human/mRNA/rna68.fna','Homo sapiens')
+# extractRefseqPr('/data/shangzhong/CHO2Human/mRNA/rna68_cho.fna','/data/shangzhong/CHO2Human/mRNA/rna68.fna','Cricetulus griseus')
+# extractRefseqPr('/data/shangzhong/CHO2Human/mRNA/rna68_mouse.fna','/data/shangzhong/CHO2Human/mRNA/rna68.fna','Mus musculus')

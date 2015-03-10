@@ -2,6 +2,16 @@ import subprocess
 import os
 from os import listdir
 #==========  gsnap alignment  ==========================
+def gsnap_Db(fa,db_path,db_name,annotation):
+    """
+    This function builds index for genome
+    """
+    cmd = ('gmap_build -D {db_path} -d {db_name} {fa}').format(db_path=db_path,db_name=db_name,fa=fa)
+    subprocess.call(cmd,shell=True)
+    if annotation != '':
+        cmd = ('iit_store -G -o {db_name} {annotation}').format(db_name=db_name,annotation=annotation)
+    subprocess.call(cmd,shell=True)
+
 def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
     """
     This function run gsnap command to map. Fastq files is a list, each item
@@ -45,7 +55,7 @@ def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
                             '-N 1 -s {annotation} {fastq} --force-xs-dir > {output} && ').format(db_path=db_path
                             ,db_name=db_name,thread=thread,annotation=annotation,
                             fastq=fastq[0],output=output)
-    subprocess.check_call(cmd[:-3],shell=True)
+    subprocess.call(cmd[:-3],shell=True)
     return map_result
 
 #=========  bowtie2 alignment  ========================= 
@@ -141,7 +151,7 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
         cmd = ('STAR --runMode genomeGenerate --genomeDir {db_path} '
                '--genomeFastaFiles {ref_fa} --runThreadN {thread} '
                '--limitGenomeGenerateRAM 310000000000 ').format(
-                db_path=db_path,ref_fa=ref_fa,thread=thread)
+                db_path=db_path,ref_fa=ref_fa,thread=str(thread))
         if annotation != '':
             cmd = cmd + ('--sjdbGTFfile {gff3} --sjdbGTFtagExonParentTranscript Parent '
                          '--sjdbOverhang 100').format(gff3=annotation)

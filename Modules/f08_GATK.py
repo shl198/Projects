@@ -1,6 +1,6 @@
 import subprocess
 
-def RealignerTargetCreator(gatk,dedupbams,reference,thread):
+def RealignerTargetCreator(gatk,dedupbams,reference,thread,*gold_indels):
     """
     This function creates interval files for realigning.
     Input is deduplicated sorted bam files. reference is 
@@ -14,12 +14,19 @@ def RealignerTargetCreator(gatk,dedupbams,reference,thread):
         singleCmd =  ('java -jar {gatk} -T RealignerTargetCreator '
                '-R {ref_fa} -I {dedup} -o {output} -nt {thread}').format(
                 gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval,
-                thread=thread)
-        cmd = cmd + singleCmd + ' && '
+                thread=str(thread))
+        if gold_indels == ():
+            cmd = ('{cmd} {singleCmd} && ').format(cmd=cmd,singleCmd=singleCmd) 
+        else:
+            indel = ''
+            for gold_indel in gold_indels:
+                indel =('{indel} -known {gold}').format(indel=indel,gold=gold_indel)
+            cmd = ('{cmd} {singleCmd} {indel} && ').format(cmd=cmd,singleCmd=singleCmd,
+                                                           indel=indel)
     subprocess.check_call(cmd[:-3],shell=True)
     return interval_files
 
-def IndelRealigner(gatk,dedupbams,reference,intervals):
+def IndelRealigner(gatk,dedupbams,reference,intervals,*gold_indels):
     """
     This function realigns the deduped bam file to intervals
     reference is fasta file, target is target interval file.
@@ -29,27 +36,33 @@ def IndelRealigner(gatk,dedupbams,reference,intervals):
     for dedupbam,interval in zip(dedupbams,intervals):
         realign = dedupbam[:-9] + 'reali.bam'
         realigned_files.append(realign)
-        cmd = cmd + ('java -jar {gatk} -T IndelRealigner -R {ref_fa} '
+        singleCmd = ('java -jar {gatk} -T IndelRealigner -R {ref_fa} '
                '-I {input} -targetIntervals {target} '
-               '-o {output} & ').format(gatk=gatk,ref_fa=reference,
+               '-o {output}').format(gatk=gatk,ref_fa=reference,
                 input=dedupbam,target=interval,output=realign)
+        if gold_indels == ():
+            cmd = ('{cmd} {singleCmd} & ').format(cmd=cmd,singleCmd=singleCmd)
+        else:
+            indel = ''
+            for gold_indel in gold_indels:
+                indel =('{indel} -known {gold}').format(indel=indel,gold=gold_indel)
+            cmd = ('{cmd} {singleCmd} {indel} & ').format(cmd=cmd,singleCmd=singleCmd,
+                                                           indel=indel)
     subprocess.check_call(cmd + 'wait',shell=True)
     return realigned_files
 
-def HaplotypeCaller_DNA_VCF(gatk,recal_files,reference,thread):
+
+def HaplotypeCaller_DNA_VCF(gatk,recal_file,reference,thread):
     """
-    this function use HaplotypeCaller to call the variant
+    this function use HaplotypeCaller to call the variant for only one sample
     """
-    vcf_files = []
-    for recal in recal_files:
-        vcf = recal[:-9] + 'raw.vcf'
-        vcf_files.append(vcf)
-        cmd = ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
-               '-I {input} -nct {thread} --genotyping_mode DISCOVERY -stand_emit_conf 15 ' 
-               '-stand_call_conf 30 -o {output}').format(gatk=gatk,
-                ref_fa=reference,input=recal,output=vcf,thread='2')
-        subprocess.check_call(cmd,shell=True)
-    return vcf_files
+    vcf = recal_file[:-9] + 'raw.vcf'
+    cmd = ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
+           '-I {input} -nct {thread} --genotyping_mode DISCOVERY -stand_emit_conf 15 ' 
+           '-stand_call_conf 30 -o {output}').format(gatk=gatk,
+            ref_fa=reference,input=recal_file,output=vcf,thread=thread)
+    subprocess.check_call(cmd,shell=True)
+    return vcf
     
 def HaplotypeCaller_DNA_gVCF(gatk,recal_files,reference,thread):
     """
@@ -68,6 +81,23 @@ def HaplotypeCaller_DNA_gVCF(gatk,recal_files,reference,thread):
                 ref_fa=reference,input=recal,output=vcf)
     subprocess.check_call(cmd + 'wait',shell=True)
     return vcf_files
+
+
+def Queue_HaplotypeCaller_DNA_gvcf(queue,haplotypeScalaFile,recal_files,reference,thread):
+    """
+    This function runs haplotypeCaller through queue.
+    """
+    vcf_files = []
+    cmd = ''
+    for recal in recal_files:
+        vcf = recal[:-9] + 'raw.g.vcf'
+        vcf_files.append(vcf)
+        cmd = cmd + ('java -jar {queue} -S {haplotype} -R {ref} -I {recal} -sg {thread} '
+                     '-O {output} -run && ').format(queue=queue,haplotype=haplotypeScalaFile,
+                        ref=reference,recal=recal,thread=str(thread),output=vcf)
+    subprocess.call(cmd[:-3],shell=True)
+    return vcf_files
+
 
 def JointGenotype(gatk,gvcf_files,reference,samplename,thread):
     """
@@ -245,6 +275,66 @@ def VQSR(gatk,raw_gvcf,gold_snp,gold_indel,reference,thread):
     subprocess.check_call(cmd,shell=True)
     return recal_variant
 
+def VQSR_human(gatk,raw_gvcf,reference,thread,hapmap,omni,G1000,dbsnp,mills):
+    """
+    this file does variant qulity score recalibration and filter snps and 
+    indels automatically.
+    """
+    # 1. build recalibration model for snp
+    recal_snp = raw_gvcf[:-9] + 'SNP.recal'
+    tranch_snp = raw_gvcf[:-9] + 'SNP.tranches'
+    rplot_snp = raw_gvcf[:-9] + 'SNP_plots.R'
+    cmd = ('java -jar {gatk} -T VariantRecalibrator -R {ref_fa} -input {input} '
+           '-resource:hapmap,known=false,training=true,truth=true,prior=15.0 {hapmap} '
+           '-resource:omni,known=false,training=true,truth=true,prior=12.0 {omni} '
+           '-resource:1000G,known=false,training=true,truth=false,prior=10.0 {G1000} '
+           '-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 {dbsnp} '
+           '-an DP -an QD -an FS -an SOR -an MQ -an MQRankSum -an ReadPosRankSum '
+           '-mode SNP -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 '
+           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot} '
+           '-nt {thread}').format(
+            gatk=gatk,ref_fa=reference,input=raw_gvcf,hapmap=hapmap,omni=omni,
+            G1000=G1000,dbsnp=dbsnp,
+            recal=recal_snp,tranch=tranch_snp,rplot=rplot_snp,
+            thread=thread)
+    subprocess.check_call(cmd,shell=True)
+    
+    # 2. apply the desired level of recalibration to the SNPs in the call set
+    recalSnp_rawIndel = raw_gvcf[:-9] + 'recalSnp_rawIndel.vcf'
+    cmd = ('java -jar {gatk} -T ApplyRecalibration -R {ref_fa} -input {input} '
+           '-mode SNP --ts_filter_level 99.0 -recalFile {recal} '
+           '-tranchesFile {tranch} -o {output}').format(gatk=gatk,ref_fa=reference,
+            input=raw_gvcf,recal=recal_snp,tranch=tranch_snp,
+            output=recalSnp_rawIndel)
+    subprocess.check_call(cmd,shell=True)
+    
+    # 3. build recalibration model for indel
+    recal_indel = raw_gvcf[:-9] + 'indel.recal'
+    tranch_indel = raw_gvcf[:-9] + 'indel.tranches'
+    rplot_indel = raw_gvcf[:-9] + 'indel_plots.R'
+    cmd = ('java -jar {gatk} -T VariantRecalibrator -R {ref_fa} -input {input} '
+           '-resource:mills,known=true,training=true,truth=true,prior=12.0 '
+           '{mills} -an QD -an DP -an FS -an SOR -an MQRankSum -an ReadPosRankSum '
+           '-mode INDEL -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 '
+           '--maxGaussians 4 '
+           '-recalFile {recal} -tranchesFile {tranch} -rscriptFile {rplot} ' 
+           '-nt {thread}').format(
+            gatk=gatk,ref_fa=reference,input=raw_gvcf,mills=mills,
+            recal=recal_indel,tranch=tranch_indel,rplot=rplot_indel,
+            thread=thread)
+    subprocess.check_call(cmd,shell=True)
+    
+    # 4. apply the desired level of recalibration to the Indels in the call set
+    recal_variant = raw_gvcf[:-9] + 'recal_variant.vcf'
+    cmd = ('java -jar {gatk} -T ApplyRecalibration -R {ref_fa} -input {input} '
+           '-mode INDEL --ts_filter_level 99.0 -recalFile {recal} '
+           '-tranchesFile {tranch} -o {output}').format(gatk=gatk,ref_fa=reference,
+            input=recalSnp_rawIndel,recal=recal_indel,tranch=tranch_indel,
+            output=recal_variant)
+    subprocess.check_call(cmd,shell=True)
+    return recal_variant
+
+
 ##***************** RNA specific **************************
 def splitN(gatk,dedupBams,ref_fa):
     """
@@ -262,7 +352,7 @@ def splitN(gatk,dedupBams,ref_fa):
     subprocess.check_call(cmd[:-3],shell=True)
     return splitBams
 
-def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference):
+def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference,thread='1'):
     """
     This function calls variants in RNAseq
     """
@@ -274,8 +364,8 @@ def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference):
         cmd = cmd + ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
         '-I {input} -dontUseSoftClippedBases ' 
         '-stand_call_conf 20.0 -stand_emit_conf 20.0 -o {output} '
-        '& ').format(
-        gatk=gatk,ref_fa=reference,input=recal,output=vcf)
+        '-nct {thread} && ').format(
+        gatk=gatk,ref_fa=reference,input=recal,output=vcf,thread=thread)
     subprocess.check_call(cmd + 'wait',shell=True)
     return vcf_files
 
@@ -300,7 +390,7 @@ def RNA_Vari_Filter(gatk,vcfs,ref_fa):
 
 def RNA_BaseRecalibrator(gatk,realignbams,reference,gold_vcfs,roundNum,thread):
     """
-    this function do base recalibration
+    this function does base recalibration
     """
     # 1. Analyze patterns of covariation in the sequence dataset
     cmd = ''
@@ -351,4 +441,27 @@ def RNA_BaseRecalibrator(gatk,realignbams,reference,gold_vcfs,roundNum,thread):
         thread=thread)
     subprocess.check_call(cmd[:-3],shell=True)
     return recal_bams
+    
+    
+#=========== preprocess of gvcf file ==========================
+def CombineSNPandINDEL(gatk,ref_fa,variantFiles,argus):
+    """
+    This function combines the vcf files.
+    
+    * gatk: gatk software pathway
+    * ref_fa: reference genome fasta file
+    * variantFiles: a list of vcf files that need to be combined
+    * argus: additional argument
+    """
+    variCmd = ''
+    outputVcf = 'combine.vcf'
+    for vari in variantFiles:
+        variCmd = variCmd + '-V {vari} '.format(vari=vari)
+    cmd = ('java -jar {gatk} -R {ref_fa} -T CombineVariants '
+           '{varis}-o {outputVcf} {argu}').format(gatk=gatk,ref_fa=ref_fa,
+            varis=variCmd,outputVcf=outputVcf,argu=argus)
+    subprocess.call(cmd.split())
+    return outputVcf
+    
+    
     
