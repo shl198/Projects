@@ -1,198 +1,7 @@
-import subprocess,os,sys
+import sys
 from Bio import SeqIO
-import pandas as pd
+from Modules.p05_ParseGff import *
 
-#===============================================================================
-#                      some basic sequence process
-#===============================================================================
-
-def vari3letter2vari1letter(vari):
-    """
-    This function change variants in the form of Arg359Lys, to one letter format
-    return R359K
-    
-    * vari: input vairants
-    """
-    dic = {'Ala':'A', 'Arg':'R', 'Asn':'N', 'Asp':'D', 'Cys':'C',
-           'Glu':'E', 'Gln':'Q', 'Gly':'G', 'His':'H', 'Ile':'I',
-           'Leu':'L', 'Lys':'K', 'Met':'M', 'Phe':'F', 'Pro':'P',
-           'Ser':'S', 'Thr':'T', 'Trp':'W', 'Tyr':'Y', 'Val':'V',
-           'Ter':'*'}
-    res = ''
-    n = 0
-    for i in range(len(vari)):
-        if n == len(vari) - 1:
-            res = res + vari[n]
-            break
-        else:
-            if vari[i].isupper():
-                res = res + dic[vari[n:n+3]]
-                n = n + 3
-            else:
-                if i < n:
-                    continue
-                else:
-                    res = res + vari[n]
-                    n = n + 1
- 
-    return res
-
-def DNA_complement_reverse(sequence):
-    """
-    This fucntion gets the complement reverse sequence of a sequence
-    
-    * sequence: a string of sequence in ATCG format
-    """
-    dic = {'A':'T','T':'A','C':'G','G':'C','N':'N'}
-    result = ''
-    for letter in sequence:
-        result = dic[letter] + result
-    return result
-
-def RNA2Pr(RNA,CodonFile):
-    """
-    This function translate RNA to protein,
-    return amino acid sequence
-    
-    * RNA: rna sequence
-    * CodonFile: filename. It has codon table
-    """
-    codon = {}
-    res = open(CodonFile,'r')
-    # build codon library
-    for line in res:
-        if line[-1] == '\n':
-            item = line[:-1].split(' ')
-        else:
-            item = line.split(' ')
-        try:
-            codon[item[0]] = item[1]
-        except:
-            codon[item[0]] = ''
-    res.close()
-    # start decode
-    i = 0
-    code = RNA[i:i+3]
-    try:
-        amino = codon[code]
-    except:
-        amino = 'X'
-    AA = amino  # get the 1st amino acids
-    while amino != '':
-        i = i + 3
-        if i < len(RNA) - 2:
-            try:
-                code = RNA[i:i+3]
-                amino = codon[code]
-                AA = AA + amino            
-            except:
-                amino = 'X'
-                AA = AA + amino
-        else:
-            break
-    return AA
-
-def get_AA_from_gff(refDNA_dic,gffFile,chrom,gene,transcript,CodonFile,outputFile=''):
-    """
-    This function extracts amino acid sequence from gff annotation file, given 
-    reference sequence dictionary, chromosome name, gene name, transcript id
-    and CodonFile.
-    
-    * refDNA_dic: dictionary get from command record_dict = SeqIO.index(fastaFile,'fasta')
-    * gffFile: gff annotation file
-    * chrom: chromosome name
-    * gene: gene symbol
-    * transcript: transcript id
-    * CodonFile: file has two columns. 1st is codon, 2nd is amino acids.
-    
-    """
-    # get chromosome sequence
-    chr_seq = str(refDNA_dic[chrom].seq)
-    # get CDS, the coding sequence, different genes may have same transcript id, so here we need to grep gene after grep trid.
-    cmd = ('grep \'Parent={trans_id}\' {gff} | grep \'{gene}\' | awk -F \'\\t\' \'{ifcmd} {printrow}\'').format(trans_id=transcript,gff=gffFile,gene=gene,
-                                                                                          ifcmd='$3==\"CDS\"',printrow='{print $4FS$5FS$7FS$9}') 
-    exon_loci = subprocess.check_output(cmd,shell=True)
-    exon_loci_list = exon_loci[:-1].split('\n')
-    # combine CDS together
-    start_loci = []; stop_loci = [];strand = []; 
-    for item in exon_loci_list:
-        locis = item.split('\t')
-        start_loci.append(locis[0])
-        stop_loci.append(locis[1])
-        strand.append(locis[2])
-    transcript_seq = ''
-    for i,j,k in zip(start_loci,stop_loci,strand):
-        i = int(i); j = int(j)
-        if k == '+': # this means the transcript is in positive strand
-            transcript_seq = transcript_seq + chr_seq[i-1:j]
-        elif k == '-':  # this transcript is in negtive strand
-            transcript_seq = transcript_seq + DNA_complement_reverse(chr_seq[i-1:j])
-            
-    # get the amino acid sequence
-    AA = RNA2Pr(transcript_seq,CodonFile)
-    # get the online protein sequence
-    try:
-        index = exon_loci_list[0].index('protein_id=')
-        protein_id = exon_loci_list[0][index + 11:]
-        from Bio import Entrez
-        Entrez.email = 'shl198@eng.ucsd.edu'
-        handle = Entrez.efetch(db = 'protein',id=protein_id,rettype='fasta',retmode='text')
-        record = handle.read()
-        sequence = ''.join(record.split('\n')[1:-2])
-        if outputFile=='':
-            with open('LocalOnlineProteinDiff.fa','a') as f:
-                if AA != sequence:
-                    f.write('>' + exon_loci_list[0].split('\t')[-1] + '\n' + sequence + '\n\n')
-        else:
-            with open(outputFile,'a') as f:
-                if AA != sequence:
-                    f.write('>' + exon_loci_list[0].split('\t')[-1] + '\n' + sequence + '\n\n')
-    except:
-        print transcript,'do not have protein id in annotation file'
-    return AA
-
-# eg:
-# record_dict = SeqIO.index('/opt/genome/cho/chok1.fa','fasta')
-# get_AA_from_gff(record_dict,'/opt/genome/cho/chok1.gff3','NW_003615779.1','LOC103160018','gene23081',
-#                 '/data/shangzhong/VariantCall/RNA_codon_table.txt')
-
-
-def get_diff_pr_from_refseq(outputFile,gene_list_file,ref_fa,ref_gff3,CodonFile):
-    """
-    This function tests whether protein sequences encoded by the genes in the given list
-    are different from refseq protein sequnce. Return inconsistant sequences
-    
-    *outputFile: file that stores the inconsistant sequences.
-    *gene_list: a list of gene names
-    *ref_gff3: an annotation file
-    """
-    df = pd.read_csv(gene_list_file,header=0,names=['Gene'])
-    genes = df['Gene'].tolist()
-    # define three list
-    query_gene=[];query_chrom=[];query_trid=[]
-    # get all genes, chromosomes and trids
-    for gene in genes:
-        cmd = ('grep \'gene={gene}\' {gff3} | awk -F \'\\t\' \'{ifcmd} {printrow}\'').format(
-                gene=gene,gff3=ref_gff3,ifcmd='$3==\"CDS\"',printrow='{print $1FS$9}')
-        record = subprocess.check_output(cmd,shell=True)
-        records = record[:-1].split('\n')
-        for line in records:
-            item = line.split('\t')
-            # get trid
-            index1=item[1].index('Parent=')
-            index2=item[1].index('Dbxref=')
-            trid=item[1][index1+7:index2-1]
-            if (item[0] in query_chrom) and (trid in query_trid):
-                continue
-            else:
-                query_gene.append(gene);query_chrom.append(item[0]);query_trid.append(trid)
-    # loop for each trascript
-    refDNA_dic = SeqIO.index(ref_fa,'fasta')
-    for chrom,gene,trid in zip(query_chrom,query_gene,query_trid):
-        AA = get_AA_from_gff(refDNA_dic,ref_gff3,chrom,gene,trid,CodonFile,outputFile)
-# get_diff_pr_from_refseq('/data/shangzhong/VariantCall/hamster_pr_different_from_refseq.fa','/data/shangzhong/VariantCall/DNA_repair_genes.hamster.txt',
-#                         '/opt/genome/hamster/hamster.fa','/opt/genome/hamster/hamster.gff3',
-#                         '/data/shangzhong/VariantCall/RNA_codon_table.txt')
 #===============================================================================
 #                 snpEff and snpSift
 #===============================================================================
@@ -236,10 +45,16 @@ def snpSift_filterVCF(annotatedVCF,snpSift,filters):
 #                 Provean analysis related functions
 #===============================================================================
 def vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile):
+    """
+    This function prepares input files for provean. protein.fa and variant.txt
+    
+    * filteredVCF: vcf file filtered using snpSift
+    * record_dict: 
+    """
     vcf_df = pd.read_csv(filteredVCF,sep='\t')
     if vcf_df.empty:
         return [[],[]]
-    ## 1. define the dictionaries and file lists.
+    ##------- 1. define the dictionaries and file lists ------------
 #     pro_vari_dic = {}   # dictionary. Format: transcriptID:[protein variants]
 #     trid_gene_dic = {}  # dictionary. Format: transcriptID:[gene symbol]
 #     trid_chrom = {}     # dictionary. Format: transcriptID:[chromosome]
@@ -247,7 +62,8 @@ def vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile):
     gene_trid2vari = {}   # dictionary. Format: gene_transcriptID:[protein variants]
     protein_files = [] # stores input files of protein sequences
     variant_files = [] # stores input files of variants
-    # 2. build the dictionaries.
+    ##------ 2. build the dictionaries. The reason for building the libraryies is that one ----------
+    #    transcript may have many variants in different lines.
     for i in range(len(vcf_df['#CHROM'])):
         chrom = vcf_df['#CHROM'][i]
         impacts = vcf_df['ANN[*].IMPACT'][i].split(',')
@@ -258,7 +74,7 @@ def vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile):
             if vari == '.':
                 continue
             else:
-                # if trid is Transcript_genenumber, remove the transcript_
+                # if trid is in the format of Transcript_genenumber, remove the transcript_
                 if 'Transcript_' in trid:
                     trid = trid[11:] 
                 
@@ -274,8 +90,10 @@ def vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile):
                         gene_trid2chrom[gene_trid] = chrom
                 else:
                     continue
-    # 3. generate a list of protein fa files and variant txt files.
-    for gene_trid in gene_trid2vari:
+    
+    gene_tridList = sorted(gene_trid2vari.keys())
+    #------- 3. generate a list of protein fa files and variant txt files ----
+    for gene_trid in gene_tridList:
         item = gene_trid.split('_')
         gene = item[0]; trid = item[1]
         chrom = gene_trid2chrom[gene_trid]
@@ -292,7 +110,7 @@ def vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile):
             protein_output.write(('>{gene_trid} \n{AA}').format(gene_trid=gene+'_'+trid,AA=AA))
         except:
             print 'fail to get',gene,'amino acid sequence.'
-            sys.exit(1)
+            raise
         protein_output.close()
         ### generate variant txt file
         variant_output = open(vari_file,'w')

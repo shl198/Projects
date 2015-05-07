@@ -73,6 +73,10 @@ def addReadGroup(picard,sortBamFiles,readgroups):
 
 def sam2fastq(picard,samFiles,endType):
     """
+    This function transfer sam/bam to fastq files
+    For paired end data, return [['f1.fq.gz','f2.fq.gz'],...]
+    for single end data, return [['f1.fq.gz'],...]
+    
     * samFiles is a list of sam/bam files
     * Type: 'single' or 'pair'
     """
@@ -91,11 +95,11 @@ def sam2fastq(picard,samFiles,endType):
     else:
         for sam in samFiles:
             fq = sam[:-4] + '.fq.gz'
-            fqs.append(fq)
-            sam2fqCmd = ('java -jar {sam2fq} I={intput} F={fq} '
+            fqs.append([fq])
+            sam2fqCmd = ('java -jar {sam2fq} I={input} F={fq} '
                          'VALIDATION_STRINGENCY=LENIENT').format(
                         sam2fq=sam2fq,input=sam,fq=fq)
             cmd = cmd + sam2fqCmd + ' & '
-    subprocess.check_call(cmd + 'wait',shell=True)
+    subprocess.call(cmd + 'wait',shell=True)
     return fqs
 

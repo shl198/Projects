@@ -35,7 +35,7 @@ def list_files(file_path):
     while len(allFiles) > 1:           # this is to append the single end or pair end files into a list.
         if allFiles[0].endswith(".fastq.gz"):
             index = allFiles[0].index(".fastq.gz")
-            if allFiles[1][index - 1] == '2':
+            if allFiles[1][index-2:index - 1] == '_2':
                 fastqFiles.append(allFiles[:2])
                 del allFiles[:2]
             else:
@@ -53,7 +53,7 @@ def list_files(file_path):
                     del allFiles[:1]
     if len(allFiles) == 1:
         fastqFiles.append(allFiles)
-    
+
     return fastqFiles
 
 def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file=''):

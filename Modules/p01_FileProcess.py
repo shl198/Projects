@@ -7,21 +7,21 @@ def remove(files):
     this function can remove files provided
     Arguments:  1. files: a list of files to be removed
     
-    files: a list of files to be removed. [f1,f2,f3,...]
+    files: a list of files to be removed. [f1,f2,f3,...] or [[f1,f2],[f3],...] or with any depth of list layers
     """
     if isinstance(files,str):
+        os.remove(files)
         try:
-            os.remove(files)
+            os.remove(files + '.bai')
         except:
-            print files, 'does not exist'
-            sys.exit(1)
+            pass
     if isinstance(files,list):
         for f in files:
+            remove(f)
             try:
-                os.remove(f)
+                remove(f+'.bai')
             except:
-                print f, 'does not exist'
-                sys.exit(1)
+                continue
 
 
 def get_parameters(parFile):

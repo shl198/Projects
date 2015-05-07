@@ -5,14 +5,19 @@ def annotateBlast(blastFile,anno_type):
     This function annotates the results got by running all sorts of 
     blast algorithm. It adds the names of reference genomes
     
-    blastFiles: blast file name    
-    anno_type: 'nucleotide' or 'protein'
+    * blastFiles: str. blast file name    
+    * anno_type: str. 'nucleotide' or 'protein'
     
     output a list of files: [f1.blast.anno.txt,f2.blast.anno.txt,...]
     """
     result = open(blastFile,'r')
     annotation_file = blastFile[:-3] + 'anno.txt'
     output = open(annotation_file,'w')
+    header = ['Reference Organism genome','Sequence type','query id',
+              'subject id','identity','length','mismatch','gapopen',
+              'query start','query end','subject start','subject end',
+              'evalue','bitscore']
+    output.write('\t'.join(header)+'\n')
     i = 0
     for item in result:
         i = i +1

@@ -47,7 +47,7 @@ def geneSymbol2EntrezID(Dict,output_path,inputpath,sym2ID='yes'):
                 print item[0]
         result.close()
         output.close()
-
+        os.remove(inputpath + '/' + filename)
 
 # def addEntrezGeneID2CufflinkResultWithEnsemblAnnotation(ConvertFile,geneFpkmFile):
 #     """
@@ -106,6 +106,30 @@ def geneSymbol2ID4Cufflink(ConvertFile,geneFpkmFile):
 #     geneFpkmFile = folder + '/genes.fpkm_tracking'
 #     geneSymbol2ID4Cufflink('/data/shangzhong/Database/chok1_ID_symbol.txt',
 #                        geneFpkmFile)
+
+def addGeneNameForDESeqResult(InFile,MapFile):
+    """
+    this function insert gene name in the first column of DESeqResult
+    
+    * InFile: str. Filename for storing the results. eg: filename.xlsx or filename.csv
+    * MapFile: str. Filename of the DESeq reuslt
+    return csv file. eg: filename.name.csv
+    """
+    df = pd.read_excel(InFile,header=0)
+    mapdf = pd.read_csv(MapFile,header=None,usecols=[0,1],names=['ID','Symbol'],sep='\t')
+    mapdf['ID'] = mapdf['ID'].apply(lambda x: str(x[:x.index('.')]))
+    mapdf = mapdf.drop_duplicates()
+    geneID = []
+    dic = {}
+    
+    for gene_id, gene_name in zip(mapdf['ID'],mapdf['Symbol']):
+        dic[gene_id] = gene_name
+    for gene_id in df['ID']:
+        geneID.append(dic[gene_id])
+    df.insert(0,'gene name',pd.Series(geneID))
+    output = InFile[:-4] + 'name.csv'
+    df.to_csv(InFile[:-4] + 'name.csv',index=False)
+    return output
 #===============================================================================
 # This part is more useful for blast results
 #===============================================================================

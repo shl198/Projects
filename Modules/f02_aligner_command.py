@@ -11,7 +11,9 @@ def gsnap_Db(fa,db_path,db_name,annotation):
     if annotation != '':
         cmd = ('iit_store -G -o {db_name} {annotation}').format(db_name=db_name,annotation=annotation)
     subprocess.call(cmd,shell=True)
-
+    # move the the target maps folder
+    cmd = ('mv {iit_file} {folder}').format(iit_file=db_name+'.iit',folder=db_path+'/'+db_name+'/'+db_name+'.maps')
+    subprocess.call(cmd,shell=True)
 def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
     """
     This function run gsnap command to map. Fastq files is a list, each item
@@ -60,6 +62,13 @@ def gsnap(fastqFiles,db_path, db_name,annotation,thread=1):
 
 #=========  bowtie2 alignment  ========================= 
 def bowtie2(fastqFiles,database,thread=1):
+    """
+    This function runs bowtie2
+
+    * fastqFiles: list of fastqFiles. paired_end:[[f1.fq.gz,f2.fq.gz]]. single_end:[[f1.fq.gz]]
+    * database: index of bowtie2
+    * thread: number of thread to use
+    """
     map_result = []
     cmd = ''
     for fastq in fastqFiles:
@@ -104,19 +113,39 @@ def tophat(fastqFiles,database,annotation,thread=1):
     return map_result
 
 #============  Blast Alignment  ===========================
+def makeblast(ref_fa,db_type,out):
+    """
+    This function make index for the reference fa file
+    
+    * ref_fa: reference fa file
+    * db_type: database type. Default: 'nucl', Alternate: 'prot'
+    * out: name for created database
+    """
+    cmd = ('makeblastdb -in {ref} -dbtype {type} -out {out} -title {title}').format(
+            ref=ref_fa,type=db_type,out=out,title=out)
+    subprocess.call(cmd.split(' '))
+    
+
 def blastn(faFiles,database,thread = 1):
     """
     this function run blastn,default model is running through internet 
     """
     map_result = []
     for fa in faFiles:
-        output = fa[:-2] + 'blast.txt'
+        if fa.endswith('.gz'):
+            output = fa[:-5] + 'blast.txt'
+            fa = '<(gunzip -c {fa})'.format(fa=fa)
+        else:
+            if fa.endswith('.fasta'):
+                output = fa[:-5] + 'blast.txt'
+            else:
+                output = fa[:-2] + 'blast.txt'
         map_result.append(output)
         blastn = ('blastn -query {input} -task megablast -out {output} '
-                  '-db {db} -evalue 1e-10 -word_size 10 -outfmt 6 '
+                  '-db {db} -evalue 1e-7 -word_size 10 -outfmt 6 '
                   '-num_alignments 1 -num_threads {thread} ').format(
                   input=fa,output=output,db=database,thread=thread)
-        subprocess.check_call(blastn,shell=True)
+        subprocess.check_call(blastn,shell=True,executable='/bin/bash')
     return map_result
 #============ bwa alignment  ===============================
 def bwa_vari(readgroup,fqFiles,database,thread=1):
@@ -154,7 +183,7 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
                 db_path=db_path,ref_fa=ref_fa,thread=str(thread))
         if annotation != '':
             cmd = cmd + ('--sjdbGTFfile {gff3} --sjdbGTFtagExonParentTranscript Parent '
-                         '--sjdbOverhang 100').format(gff3=annotation)
+                         '--sjdbOverhang 100').format(gff3=annotation)   # for geneDb add --sjdbGTFfeatureExon CDS
     subprocess.check_call(cmd,shell=True)
     
 def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):

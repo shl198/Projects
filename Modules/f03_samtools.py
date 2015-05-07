@@ -1,5 +1,5 @@
 import subprocess
-def sam2bam_sort(samfiles,thread=1):
+def sam2bam_sort(samfiles,thread=1,sortType=''):
     """
     This function will change sam file to bam file and sort bam files
     """
@@ -20,8 +20,12 @@ def sam2bam_sort(samfiles,thread=1):
         # remove sam file
         rmSamCmd = rmSamCmd + 'rm {sam} & '.format(sam=sam)
         # sort bam file
-        sortBamCmd = sortBamCmd + ('samtools sort -m 4G -@ {thread} -T {sort} {bam} '
-                                   '-o {sortbam} && ').format(thread=thread,sort=sort,
+        if sortType == 'name':
+            tag = ' -n'
+        else:
+            tag = ''
+        sortBamCmd = sortBamCmd + ('samtools sort{tag} -m 4G -@ {thread} -T {sort} {bam} '
+                                   '-o {sortbam} && ').format(tag=tag,thread=thread,sort=sort,
                                     bam=bam,sortbam=sort_bam)
         # index bam file
         indexCmd = indexCmd + 'samtools index {sortbam} & '.format(sortbam=sort_bam)
@@ -51,20 +55,35 @@ def bam2sam(bamfiles):
     return samFiles
 #===========================================================================
 #===========================================================================
-def extract_mapped(map_result):
+def extract_bam(sortedBamFiles,extractType,seqType='pair',thread=1):
     """
-    This function extract the mapped reads from the sam file which 
-    is got from mapping using aligners. input map_result is a list
-    of mapped sam file
+    This function extract the mapped/unmapped reads from the bam file which 
+    is got from mapping using aligners. 
+    
+    * sortedBamFiles: a list of bam files
+    * extractType: default(map), other(unmap)
+    * thread: number of threads
     """
+    if seqType == 'single':
+        sam_tag = '4'
+    elif seqType == 'pair':
+        sam_tag = '12'
     # define returned files
     returnFile = []
     cmd = ''
-    for mapfile in map_result:
-        filename = mapfile[:-9] + '.mapped.sort.bam'
-        returnFile.append(filename)
-        cmd = cmd + 'samtools view -F 4 -bh {input} > {output} & '.format(input=mapfile,output=filename)
-    subprocess.check_call(cmd + 'wait',shell=True)
+    if extractType == 'map':
+        for bam in sortedBamFiles:
+            filename = bam[:-3] + 'map.bam'
+            returnFile.append(filename)
+            cmd = cmd + 'samtools view -@ {thread} -F {tag} -bh {input} > {output} && '.format(
+                        thread=str(thread),tag=sam_tag,input=bam,output=filename)
+    else:
+        for bam in sortedBamFiles:
+            filename = bam[:-3] + 'unmap.bam'
+            returnFile.append(filename)
+            cmd = cmd + 'samtools view -@ {thread} -f {tag} -bh {input} > {output} && '.format(
+                        thread=str(thread),tag=sam_tag,input=bam,output=filename)
+    subprocess.call(cmd[:-3],shell=True)
     
     return returnFile
 
