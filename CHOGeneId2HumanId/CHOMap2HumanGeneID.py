@@ -1,8 +1,8 @@
 import sys
 import subprocess,os
 sys.path.append('/home/shangzhong/Codes/Pipeline')
-from CHOGeneId2HumanId.IdMappingModule import MergeMapResults,mapnonOverlap,extendByName,blastp2geneMap,intersectMapping,MergeBasedOnSignificance
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
+from IdMappingModule import *
+#sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 #===============================================================================
 #  The following is the final pipeline
 #===============================================================================
@@ -28,8 +28,7 @@ mergemap = '/data/shangzhong/CHO2Mouse/MergeMapping.txt'
 final_blast = '/data/shangzhong/CHO2Mouse/2wayBlastPresult/cho2mouse.top1.gene.uniqline.uniq1stgene.final.txt'
 name_result = ['/data/shangzhong/CHO2Mouse/namemapping/141028gene_info.cho.cho2mouse.txt','/data/shangzhong/CHO2Mouse/namemapping/141028gene_info.cho.txt']
 inpara_result = '/data/shangzhong/CHO2Mouse/inparanoid_4.1/cho2mouse.inpara.gene.txt'
-merge = MergeMapResults(mergemap,name_result[0],
-           inpara_result,final_blast)   # merge = [MergeMapping.txt,MergeMapping.unmap.txt]
+merge = MergeMapResults(mergemap,name_result[0],inpara_result,final_blast)   # merge = [MergeMapping.txt,MergeMapping.unmap.txt]
    
 # # #=========== 5. map the unmapped genes ==========================
 indexFile = ['/data/shangzhong/CHO2Mouse/2wayBlastPresult/all/cho2mouse.top250.gene.uniq.index.sort.uniqline.index.index.txt',

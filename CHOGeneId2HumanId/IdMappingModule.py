@@ -221,8 +221,6 @@ def mapnonOverlap(unmapGeneIDs,indexFile):
     with open(unmapGeneIDs,'r') as inputfile:
         for line in inputfile:
             geneIds.append(line[:-1])
-    
-    
     df1 = pd.read_table(indexFile[0],names=['org1','org2','per','len','index1','index2'])
     df2 = pd.read_table(indexFile[1],names=['org1','org2','per','len','index1','index2'])
     mappedGene = {}  # stores the founded gene mappings
