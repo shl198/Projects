@@ -1,10 +1,34 @@
-Before running the pipeline:
-============================
+Variant Calling Pipeline
+========================
+
+1. Required software
+====================
+
+* fastqc
+* bwa
+* STAR
+* trimmomatic
+* samtools
+* picard
+* GATK
+* python
+* Rstudio, gplots,ggplot2,reshape,gsalib
+
+
+2. Steps before running the pipeline:
+=====================================
+
+* run fastqc for one fastq file, if the Encoding version is smaller than 1.8 then trimming is necessary, and phred should be set as 64.
+
 
 should only change the parameters in block define some parameters:
 ------------------------------------------------------------------
-1. change file_path, Trim, bwaDb, ref_fa, samplename, read_group
-2. In file Modules/f08_GATK.py: change -L option in RealignerTarget Creater, HaplotypeCaller,BaseRecalibrator.
+1). change file_path, Trim, bwaDb, ref_fa, samplename, read_group
+2). In file Modules/f08_GATK.py: change -L option in RealignerTarget Creater, HaplotypeCaller,BaseRecalibrator.
+
+
+
+
 
 Run pipeline:
 =============

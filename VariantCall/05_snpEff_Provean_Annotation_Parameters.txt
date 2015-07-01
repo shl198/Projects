@@ -1,0 +1,54 @@
+# This file has all parameters that variant annotation and provean score calculation.
+
+##=============== Parameters ==========
+thread	1
+	# number of threads
+
+
+email	username@ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	end
+	# message which will be sent to email when pipeline finishes
+
+
+reference	/path/fasta.fa
+	# the reference genome
+
+
+annotation	/path/gff3
+	# annotation file.
+
+
+CodonFile	/DNA/codon/file
+	# 1st column is codon,2nd is amino acid
+
+
+snpSift	/path/snpSift.jar
+	# snpSift
+
+
+snpEff /path/snpEff.jar
+	# snpEff
+
+
+genome	genome name
+	# must be same as in the snpeff configure file
+
+
+provean	/path/provean.sh
+	# provean
+
+
+support_set	/path/to/support/set
+	# support set for provean
+
+##========= target genes ===============
+gene_file	/path/to/gene_list.txt
+	# a file list of all interested gene symbols
