@@ -57,7 +57,6 @@ blast_nt_DB = param['blast_nt_DB']
 #========  (0) enter the directory ========================
 os.chdir(file_path)
 Message(startMessage,email)
-"""
 #========  (1) read files  ================================
 fastqFiles = list_files(file_path)
 if trim == 'True':
@@ -104,9 +103,6 @@ except:
 #========  (6) unmap2host_bams to fastq.gz =========================
 try:
     unmap2host_fq_gzs = sam2fastq(picard,unmap2host_bams,seqType) # [[file.sort.unmap2host.fq.gz]]
-    # compress to gz file
-    #for fq in unmap2host_fqs: ('gzip {fq}').format(fq=fq)
-    #unmap2host_fq_gzs = [f+'.gz' for f in unmap2host_fqs]  # file.sort.unmap2host.fq.gz
     print 'unmap2host_fq_gzs succeed'
     print 'unmap2host_fq_gzs is: ',unmap2host_fq_gzs
     remove(unmap2host_bams)
@@ -218,7 +214,6 @@ except:
     print 'assemble using Trinity failed'
     Message('assemble using Trinity failed',email)
     raise
-"""
 #========  (10) run blast to get homology ==============================
 if runBlastAfterAssemble == 'Yes':
     ### 1. blast assembled fa file

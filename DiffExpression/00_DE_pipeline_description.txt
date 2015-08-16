@@ -1,0 +1,8 @@
+Differential expression pipeline:
+
+1. run fastqc to check quality of fastq files.
+2. run trimmomatic to remove low qulity bases and adapter. shortest read length set as 36.
+3. run GSNAP to do the alignment, get sam file, usually use default parameters.
+4. run samtools to convert sam file to bam and sort bam file based on coordinates.
+5. run htseq-count to get the read count profile.
+6. run DESeq2 to do differential expression analysis, usually log2Foldchange=0.58,p-value=0.05

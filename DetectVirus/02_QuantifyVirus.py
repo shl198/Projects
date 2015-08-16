@@ -60,7 +60,7 @@ Message(startMessage,email)
 #========  (1) read files  ================================
 fastqFiles = list_files(file_path)
 if trim == 'True':
-    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)
+    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)     # [[fq.gz]]
 print 'list file succeed'
 print 'fastqFiles is: ',fastqFiles
 #========  (2) align fastq files to host ================================
@@ -70,14 +70,14 @@ try:
     else:
         map_files = STAR(fastqFiles,host_alignerDb,thread)
     print 'host align succeed'
-    print 'map_files is: ',map_files
+    print 'map_files is: ',map_files                          # [file.sam]
 except:
     print 'host align failed'
     Message('host align failed',email)
     raise
 #========  (3) sam to bam and sort  ================================
 try:
-    sorted_bams = sam2bam_sort(map_files,thread)
+    sorted_bams = sam2bam_sort(map_files,thread)            # [file.sort.bam]
     print 'host sorted succeed'
     print 'sorted_bam is: ',sorted_bams
 except:
@@ -94,17 +94,20 @@ except:
     raise
 #========  (5) extract unmapped reads  =============================
 try:
-    unmap2host_bams = extract_bam(sorted_bams,'unmap',thread)
+    unmap2host_bams = extract_bam(sorted_bams,'unmap',seqType,thread)  # [file.sort.unmap.bam]
     print 'extract unmap2host_bams succeed'
     print 'unmap2host_bams is: ',unmap2host_bams
     remove(sorted_bams)
+    # rename files
+    for f in unmap2host_bams: os.rename(f,f[:-4]+'2host.bam')
+    unmap2host_bams = [f[:-4]+'2host.bam' for f in unmap2host_bams]    # [file.sort.unmap2host.bam]
 except:
     print 'extract unmap2host_bams failed'
     Message('extract unmap2host_bams failed',email)
     raise
 #========  (6) unmap2host_bams to fastq ============================
 try:
-    unmap2host_fqs = sam2fastq(picard,unmap2host_bams,seqType)
+    unmap2host_fqs = sam2fastq(picard,unmap2host_bams,seqType)    # [[file.sort.unmap2host.fq.gz]]
     print 'unmap2host_fq succeed'
     print 'unmap2host_fqs is: ',unmap2host_fqs
     remove(unmap2host_bams)
@@ -120,7 +123,7 @@ try:
     if aligner == 'gsnap':
         map_files = gsnap(unmap2host_fqs,virus_alignerDb, virus_gsnapDbName,virus_gsnapAnnotation,thread)
     else:
-        map_files = STAR(unmap2host_fqs,virus_alignerDb,thread)
+        map_files = STAR(unmap2host_fqs,virus_alignerDb,thread)  # [file.sort.unmap2host.sam]
     print 'virus align succeed'
     print 'map_files is: ',map_files
 except:
@@ -129,7 +132,7 @@ except:
     sys.exit(1)
 #========  (2) sam to bam and sort  ================================
 try:
-    sorted_bams = sam2bam_sort(map_files,thread)
+    sorted_bams = sam2bam_sort(map_files,thread)   # [file.sort.unmap2host.sort.bam]
     print 'virus sorted succeed'
     print 'sorted_bam is: ',sorted_bams
 except:

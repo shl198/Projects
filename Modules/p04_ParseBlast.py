@@ -102,13 +102,16 @@ def extract_blast_ID_map(blastFile,topNum = 1,switch='False'):
     output.close()
     return outputFile
 
+
 def blastName2ID(blastFile,topNum=1):
     """
     This function changes query name and refernece name into id
     
-    * blastFile: tablular blast file output
+    * blastFile: str. filename of tablular blast file output. eg: filename.txt
     
-    * topNum: an int indicates the number of top hits
+    * topNum: int. An int indicates the number of top hits.
+    
+    return filename.ID.txt
     """
     id_map = [[]] * 2
     i = 0 # number of tophits
@@ -147,3 +150,34 @@ def blastName2ID(blastFile,topNum=1):
             output.write('\t'.join(item) + '\n')
     output.close()
     return outputFile
+
+
+def blast2gff(input_file,output_file):
+    """
+    This function transfers blast tabular output to gff file format
+    
+    * input_file: str. Blast result tabular format 6 output.
+    * output_file: str. 
+    """   
+    (queryID,subjectID,percIDentity,alnLength,mismatchCount,gapOpenCount,queryStart,
+    queryEnd,subjectStart,subjectEnd,eVal,bitScore) = [],[],[],[],[],[],[],[],[],[],[],[]
+    for line in open(input_file):
+        # input_file should in form: /media/shl/CHOS/A4/blast.txt
+        # output_file should in form: /media/shl/CHOS/A4/blast.gff
+        item = line.split("\t")      
+        queryID.append(item[0]);subjectID.append(item[1]);
+        percIDentity.append(item[2]);alnLength.append(item[3]);
+        mismatchCount.append(item[4]);gapOpenCount.append(item[5]);
+        queryStart.append(item[6]);queryEnd.append(item[7]);
+        subjectStart.append(item[8]);subjectEnd.append(item[9]);
+        eVal.append(item[10]);bitScore.append(item[11]);
+    f = open(output_file,'w')
+    for i in range(len(queryID)):
+        gff = [str(subjectID[i]),"blast","RNAseq",str(subjectStart[i]),str(subjectEnd[i]),str(eVal[i]),'.','.',
+               'Parent=' + str(queryID[i]) + ';percIDentity=' + str(percIDentity[i]) + 
+               ';alnLength='+str(alnLength[i]) + ';mismatchCount='+str(mismatchCount[i]) + ';gapOpenCount='
+               + str(gapOpenCount[i])+';queryStart='+str(queryStart[i])+';queryEnd'
+               +str(queryEnd[i])+';bitScore=' + str(bitScore[i])]
+        
+        f.write('\t'.join(gff))
+    f.close()

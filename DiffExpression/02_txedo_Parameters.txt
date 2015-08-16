@@ -1,0 +1,74 @@
+# This file includes all parameters that need to be set for all pipelines.
+# For paired end fastq files, make sure the file name is in the format
+# name1.fq.gz, name2.fq.gz or name1.fastq.gz, name2.fastq.gz
+
+##===============  global parameters ================================
+thread	1
+	# number of threads
+
+
+email	shl198@eng.ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	end
+	# message which will be sent to email when pipeline finishes
+
+
+refSequence	/path/to/fasta/file
+	# fasta file of target organism
+
+
+filePath	/path/to/fastq/files
+	# folder where fastq files locate
+
+
+alignerDb	/path/to/STAR/index
+	# index of refSequence for aligner to be used
+
+
+trim	True
+	# choose whether to trim the origional fastq files
+
+
+phred	33
+	# encoding score for raw data.
+	# other option: 64
+
+
+picard	/home/shangzhong/Installation/picard-tools-1.121
+	# picard folder pathway
+
+
+trimmomatic	/home/shangzhong/Installation/Trimmomatic-0.32/trimmomatic-0.32.jar
+	# trimmomatic pathway
+
+
+trimmoAdapter	
+	# trimmomatic adapter files
+
+
+#----------------- Differential Expression pipeline ------------------
+aligner	STAR
+	# set aligner to run the pipeline, gsnap and start recomended
+
+
+annotation	/gff/annotaion/file
+	# annotation file for organism
+
+
+gsnapDbName	name
+	# for gsnap need to set this parameter
+
+
+gsnapAnnotation	name.splicesites.iit
+	# annotaton file for gsnap
+
+
+symbolIDFile	null
+	# if set, the file to convert gene symbol to gene id

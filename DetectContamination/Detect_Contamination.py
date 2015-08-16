@@ -2,17 +2,21 @@
 This file builds pipeline for detecting any contaminations in cho RNAseq samples.
 """
 #=============  import required packages  =============
+import os
+from os import listdir
+import sys
+sys.path.append('/home/shangzhong/Codes/Pipeline')
+
 from Modules.f01_list_files import list_fastq
 from Modules.f02_aligner_command import gsnap,blastn
 from Modules.f03_samtools import *
 from Modules.f06_reads_stat import *
-import os
-from os import listdir
+
+#=============  define some parameters  ===============
 #file_path = sys.argv[1]
-file_path = '/data/RNAseq/seq/108' 
+file_path = '/data/RNAseq/seq/120' 
 chok1_annotation = '/opt/genome/cho/chok1.gff3'
 ntdb = '/data/140822ntdatabase/nt'
-#=============  define some parameters  ===============
 thread = '6'
 Trim = 'False'
 microDb_path = '/home/shangzhong/Database/bacteria_fungi/gsnap_bacteriaDb'

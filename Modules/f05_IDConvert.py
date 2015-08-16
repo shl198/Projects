@@ -7,10 +7,9 @@ import subprocess
 from Bio import Entrez
 Entrez.email = "shl198@eng.ucsd.edu"
 #===============================================================================
-#  This part is for DE analysis. Convert geneSymbols to Entrez genes in the given files
+#  This part is for htseq-count results. Convert geneSymbols to Entrez genes in the given files
 #===============================================================================
-
-def geneSymbol2EntrezID(Dict,output_path,inputpath,sym2ID='yes'):
+def geneSymbol2EntrezID(DictFile,output_path,inputpath,sym2ID='yes'):
     """
     This fuction converts gene symbol in htseq-count file to entriz_gene_ID, and ID to symbol
     
@@ -24,7 +23,7 @@ def geneSymbol2EntrezID(Dict,output_path,inputpath,sym2ID='yes'):
     filelist = [f for f in allFiles if f.endswith('.sort.txt')]
     #=========== build dictionary ============
     dic = {}
-    result = open(Dict,'r')
+    result = open(DictFile,'r')
     if sym2ID =='yes':
         for line in result:
             item = line.split('\t')
@@ -49,87 +48,151 @@ def geneSymbol2EntrezID(Dict,output_path,inputpath,sym2ID='yes'):
         output.close()
         os.remove(inputpath + '/' + filename)
 
-# def addEntrezGeneID2CufflinkResultWithEnsemblAnnotation(ConvertFile,geneFpkmFile):
-#     """
-#     This function insert entrez gene ids as the 1st column in the convertfile.
-#     The cufflink results are got based on ensemble annotation file
-#     
-#     * ConvertFile: filename. has 2 columsn, 1st is gene id, 2nd is ensembl id.
-#     * geneFpkmFile: the result file genes.fpkm_tracking returned by cufflinks 
-#     """
-#     mappedIDs = []
-#     mapData = pd.read_csv(ConvertFile,sep='\t',names =['GeneID','EnsemblID'],header=0)
-#     cuffData = pd.read_csv(geneFpkmFile,sep='\t')
-#     ensemblGenes = mapData['EnsemblID'].tolist()
-#     geneIDs = mapData['GeneID'].tolist()
-#     for gene in cuffData['gene_id']:
-#         index = gene.index('.')
-#         ensembl_gene = gene[:index]
-#         #geneID = mapData.ix[mapData["ensemblID"]==ensembl_gene,'geneID']
-#         try:
-#             index = ensemblGenes.index(ensembl_gene)
-#             geneID = geneIDs[index]
-#             mappedIDs.append(geneID)
-#         except:
-#             mappedIDs.append('-')
-#     cuffData.insert(0, 'EntrezGeneID', pd.Series(mappedIDs) )
-#     
-#     outputFile = geneFpkmFile + '.csv'
-#     cuffData.to_csv(outputFile)
-#     print 'done'
 
-
-def geneSymbol2ID4Cufflink(ConvertFile,geneFpkmFile):
+#===============================================================================
+#           This part is for cufflinks
+#===============================================================================
+def addEntrezGeneID2CufflinkResultWithEnsemblAnnotation(ConvertFile,geneFpkmFile):
     """
-    This function convert the gene symbols to gene id in cufflinks results
-    and then return a file with two columns:1st Entrez geneID, 2nd FPKM
+    This function insert entrez gene ids as the 1st column in the convertfile.
+    The cufflink results are got based on ensemble annotation file
+     
+    * ConvertFile: filename. has 2 columsn, 1st is entrez gene id, 2nd is ensembl gene id.
+    * geneFpkmFile: the result file genes.fpkm_tracking returned by cufflinks 
     """
+    mappedIDs = []
+    mapData = pd.read_csv(ConvertFile,sep='\t',names =['GeneID','EnsemblID'],header=0)
     cuffData = pd.read_csv(geneFpkmFile,sep='\t')
-    mapData = pd.read_csv(ConvertFile,sep='\t',names =['GeneID','GeneSymbol','Accession'],header=None)
-    
-    outputFile = geneFpkmFile + '.txt'
-    with open(outputFile,'w') as f:
-        for symbol,fpkm,accession_locus in zip(cuffData['gene_short_name'],cuffData['FPKM'],cuffData['locus']):
-            # first, get the accession number
-            accession_number = accession_locus.split(':')[0]
-            try:
-                geneID = mapData[(mapData['GeneSymbol']==symbol) & (mapData['Accession']== accession_number)].GeneID.values[0]
-                f.write(str(geneID) + '\t' + str(fpkm) + '\n')
-            except:
-                f.write(str(symbol) + '\t' + str(fpkm) + '\n')
+    ensemblGenes = mapData['EnsemblID'].tolist()
+    geneIDs = mapData['GeneID'].tolist()
+    for gene in cuffData['gene_id']:
+        index = gene.index('.')
+        ensembl_gene = gene[:index]
+        try:
+            index = ensemblGenes.index(ensembl_gene)
+            geneID = geneIDs[index]
+            mappedIDs.append(geneID)
+        except:
+            mappedIDs.append('-')
+    cuffData.insert(0, 'EntrezGeneID', pd.Series(mappedIDs) )
+     
+    outputFile = geneFpkmFile + '.csv'
+    cuffData.to_csv(outputFile)
     print 'done'
-# pathway = '/data/shangzhong/DE/contamination_base_line/31to40'
+
+
+def addEntrezID2CufflinkResultWithNCBIAnnotation(ConvertFile,geneFpkmFile):
+    """
+    This function converts the gene symbols to gene id in cufflinks results
+    and then return a file with two columns:1st Entrez geneID, 2nd FPKM
+    
+    * ConvertFile:str. Filename of the id file, first 3 columns should be 'GeneID','GeneSymbol,'Acession'
+    * geneFpkmFile:str. Filename of cufflink genefpkmfile.
+    
+    return the new filename with id added, it's in the same folder with geneFpkmFile.
+    """
+    cuffData = pd.read_csv(geneFpkmFile,sep='\t',header=0)
+    mapData = pd.read_csv(ConvertFile,sep='\t',names =['GeneID','GeneSymbol','Accession'],header=0)
+    
+    geneIDs = []
+    outputFile = geneFpkmFile + '.txt'
+    
+    mapData['SymbolAc'] = mapData['GeneSymbol'].map(str) + mapData['Accession']
+    dic = mapData.set_index('SymbolAc')['GeneID'].to_dict()
+    
+    for symbol,accession_locus in zip(cuffData['gene_short_name'],cuffData['locus']):
+        # first, get the accession number
+        accession_number = accession_locus.split(':')[0]
+        try:
+            #geneID = mapData[(mapData['GeneSymbol']==symbol) & (mapData['Accession']== accession_number)].GeneID.values[0]
+            geneID = dic[symbol+accession_number]
+            geneIDs.append(geneID)
+        except:
+            geneIDs.append(symbol)
+    cuffData.insert(0,'Entrez_ID',pd.Series(geneIDs))
+#     # remove the duplicates
+#     res_df = cuffData.drop_duplicates(['tracking_id','gene_short_name'])
+#     cuffData_sort = res_df.sort(['Entrez_ID','gene_short_name'])
+    cuffData.to_csv(outputFile,sep='\t',index=False)
+    
+    return outputFile
+# pathway = '/data/shangzhong/DE/k1'
 # os.chdir(pathway)
 # folders = [f for f in os.listdir(pathway) if os.path.isdir(os.path.join(pathway, f))]
 # folders.sort()
 # for folder in folders:
 #     geneFpkmFile = folder + '/genes.fpkm_tracking'
-#     geneSymbol2ID4Cufflink('/data/shangzhong/Database/chok1_ID_symbol.txt',
+#     addEntrezID2CufflinkResultWithNCBIAnnotation('/data/shangzhong/Database/gff_chok1_ID_symbol_accession.txt',
 #                        geneFpkmFile)
-
-def addGeneNameForDESeqResult(InFile,MapFile):
+def addProduct2CufflinkResultWithNCBIAnnotation(ConvertFile,geneFpkmFile):
     """
-    this function insert gene name in the first column of DESeqResult
+    This function insert the product name of gene into the 1st column of cufflinks results
     
-    * InFile: str. Filename for storing the results. eg: filename.xlsx or filename.csv
-    * MapFile: str. Filename of the DESeq reuslt
+    * ConvertFile: str. Filename of gene_info from ncbi ftp for interested organism
+    * geneFpkmFile: str. Filename of gene_tracking file
+    return filename with product at 4th column. filename.product.csv
+    """
+    # build dictionary
+    mapdf = pd.read_csv(ConvertFile,sep='\t',header=None,skiprows=[0],
+                        usecols=[1,2,8],names=['GeneID','GeneSymbol','Product'])
+    dic = mapdf.set_index('GeneSymbol')['Product'].to_dict()
+    # add column
+    df = pd.read_csv(geneFpkmFile,header=0,sep='\t')
+    values = []
+    key_col = 'gene_short_name'
+    for symbol in df[key_col]:
+        if symbol in dic:
+            values.append(dic[symbol])
+        else:
+            values.append('')
+    df.insert(0,'Product',pd.Series(values))
+    outFile = geneFpkmFile[:-4]+'.product.csv'
+    df.to_csv(outFile,index=False,sep='\t')
+    return outFile
+#===============================================================================
+#        This part is for DESeq
+#===============================================================================
+def addGeneIDorNameForDESeqResult(InFile,MapFile,addType='gene_id',IDVersion='no'):
+    """
+    this function insert gene name or gene id in the first column of DESeqResult
+    
+    * InFile: str. Filename of the DESeq result. eg: filename.csv
+    * MapFile: str. Filename for storing the mapping information. 1st column is gene id, 2nd is gene symbol.
+    * addType: str. If 'gene_id', then add gene id, if 'gene_symbol' then add name
+    * IDVersion: str. If gene id has version information (eg:ESN00001.1 indicats version 1)
+    
     return csv file. eg: filename.name.csv
     """
-    df = pd.read_excel(InFile,header=0)
-    mapdf = pd.read_csv(MapFile,header=None,usecols=[0,1],names=['ID','Symbol'],sep='\t')
-    mapdf['ID'] = mapdf['ID'].apply(lambda x: str(x[:x.index('.')]))
-    mapdf = mapdf.drop_duplicates()
-    geneID = []
-    dic = {}
+    if InFile.endswith('xlsx'):
+        df = pd.read_excel(InFile,header=0)
+    else:
+        df = pd.read_csv(InFile,header=0,sep='\t')
+    mapdf = pd.read_csv(MapFile,header=0,usecols=[0,1],names=['GeneID','GeneSymbol'],sep='\t')
+    if IDVersion == 'yes':
+        mapdf['GeneID'] = mapdf['GeneID'].apply(lambda x: str(x[:x.index('.')]))
+    mapdf = mapdf.drop_duplicates().astype(str)
+    # build dictionary
+    if addType == 'gene_id':
+        dic = mapdf.set_index('GeneSymbol')['GeneID'].to_dict()
+    else:
+        dic = mapdf.set_index('GeneID')['GeneSymbol'].to_dict()
     
-    for gene_id, gene_name in zip(mapdf['ID'],mapdf['Symbol']):
-        dic[gene_id] = gene_name
-    for gene_id in df['ID']:
-        geneID.append(dic[gene_id])
-    df.insert(0,'gene name',pd.Series(geneID))
-    output = InFile[:-4] + 'name.csv'
-    df.to_csv(InFile[:-4] + 'name.csv',index=False)
+    values = []
+    for key in df[df.columns[0]]:
+        try:
+            values.append(dic[str(key)])
+        except:
+            print key,'not in the mapping file'
+            values.append('-')
+    if addType == 'gene_id':
+        added = 'Gene_ID'
+    else:
+        added = 'gene_short_name'
+    df.insert(0,added,pd.Series(values))
+    output = InFile[:-4] + '.name.csv'
+    df.to_csv(InFile[:-4] + '.name.csv',index=False,sep='\t')
     return output
+
 #===============================================================================
 # This part is more useful for blast results
 #===============================================================================
@@ -164,7 +227,7 @@ def extract_from_gene2ref(filename,taxID,organism,columnNum=[]):
         outputfile = filename[:-2] + organism  + '.txt'
         if columnNum == []:
             cmd = ('gunzip -c {input} | awk -F {sep} {parse} {printout} | '
-                   'uniq > {output}').format(sep='\"\\t\"',parse='\'$1 == ' + taxID,
+                   'uniq > {output}').format(sep='\"\\t\"',parse='\'$1 == '+taxID+' || $1 ~ /^#/',
                     printout='{print $0}\'',input=filename,
                     output=outputfile)
         else:
@@ -173,7 +236,7 @@ def extract_from_gene2ref(filename,taxID,organism,columnNum=[]):
                 printout = printout + '$' + index + ' ' + '\"\\t\"' + ' '
             printout = printout[:-6]
             cmd = ('gunzip -c {input} | awk -F {sep} {parse} {printcmd} '
-                   '| uniq > {output}').format(sep='\"\\t\"',parse = '\'$1 == ' + taxID,
+                   '| uniq > {output}').format(sep='\"\\t\"',parse = '\'$1 == '+taxID+' || $1 ~ /^#/',
                     printcmd='{' + printout + '}\'',
                     input=filename,output=outputfile)
     # unzipped file
@@ -181,7 +244,7 @@ def extract_from_gene2ref(filename,taxID,organism,columnNum=[]):
         outputfile = filename + organism  + '.txt'
         if columnNum == []:
             cmd = ('awk -F {sep} {parse} {printout} {input} | '
-                   'uniq > {output}').format(sep='\"\\t\"',parse='\'$1 == ' + taxID,
+                   'uniq > {output}').format(sep='\"\\t\"',parse='\'$1 == '+taxID+' || $1 ~ /^#/',
                     printout='{print $0}\'',input=filename,
                     output=outputfile)
         else:
@@ -191,39 +254,64 @@ def extract_from_gene2ref(filename,taxID,organism,columnNum=[]):
             printout = printout[:-6]
             cmd = ('awk -F {sep} {parse} {printcmd} {inputfile} | uniq > {output}').format(sep='\"\\t\"',
                         printcmd='{' + printout + '}\'',inputfile=filename,output=outputfile,
-                        parse = '\'$1 == ' + taxID)
+                        parse = '\'$1 == '+taxID+' || $1 ~ /^#/')
     subprocess.call(cmd,shell=True)
     
     return outputfile
 
 
-def mRNA_prID2geneIDRemote(prID,IDtype='protein'):
+def mRNA_prID2geneIDRemote(prID,IDtype='protein',target='gene'):
     """
-    This function searches latest gene ID using given mRNA or protein ID
-    through biopython. It connects to romote ncbi latest database. 
+    This function searches latest gene ID using given RNA or protein ID
+    through biopython. Or search rna given protein id. 
+    It connects to romote ncbi latest database. 
     Remote search is slow,so you should only use this if you cannot map gene IDs 
     using local gene2refseq file.
     
     return correspond geneID
     
     * prID: protein or mRNA entrez id.
-    
     * IDtype: defalut is protein.
               alternative is nucleotide.
     """
     handle = Entrez.efetch(db=IDtype,id=str(prID),rettype='gb')
     record = handle.read()
+    if  target == 'gene':
+        pattern = 'GeneID:'
+        end_sig = '\"'
+    if target =='rna':
+        pattern = 'coded_by=\"'
+        end_sig = ':\"'
     try:
-        geneIndex = record.rindex('GeneID:')  # get the last index
-        endIndex = geneIndex + 7
-        while record[endIndex] != '\"':
+        geneIndex = record.rindex(pattern)  # get the last index
+        endIndex = geneIndex + len(pattern)
+        while record[endIndex] not in end_sig:
             endIndex = endIndex + 1
-        geneId = record[geneIndex + 7:endIndex]
+        geneId = record[geneIndex + len(pattern):endIndex]
     except:
-        geneId = 'NA'
+        geneId = '-'
         print prID,'is not traceble online'
     return geneId
 
+
+def prID2mRNAIDRemote(prID,IDtype='protein'):
+    """
+    This function searches latest rna ID using given prtein id.
+    
+    * prID: str. Protein id
+    """
+    handle = Entrez.efetch(db=IDtype,id=str(prID),rettype='gb')
+    record = handle.read()
+    try:
+        rnaIndex = record.rindex('coded_by=')
+        endIndex = rnaIndex + 9
+        while record[endIndex] !=':':
+            endIndex = endIndex + 1
+        rnaID = record[rnaIndex + 9:endIndex]
+    except:
+        geneID = 'NA'
+        print prID,'is not traceble online'
+        
 
 def mRNA_prIDMap2geneIDMap(prMapFile,gene2refseq1,gene2refseq2,switch='False',IDtype = 'protein'):
     """

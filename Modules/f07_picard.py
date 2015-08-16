@@ -1,5 +1,11 @@
 import subprocess,os
 
+def chunk(l,n):
+    n = max(n,1)
+    res = [l[i:i+n] for i in range(0,len(l),n)]
+    return res
+
+
 def read_group(ID,sample,platform,library,platunit):
     return ('@RG\\tID:'+ID+'\\tSM:'+sample+'\\tPL:'+platform+'\\tLB:'+library
             +'\\tPU:'+platunit)
@@ -39,27 +45,31 @@ def markduplicates(picard,sortBams):
     subprocess.check_call(cmd[:-3],shell=True)
     return dedup_files
 
-def addReadGroup(picard,sortBamFiles,readgroups):
+def addReadGroup(picard,sortBamFiles,readgroups,batch=1):
     """
-    This function add readgroup to a list of samfiles
+    This function adds readgroup to a list of samfiles
     """
     add = picard + '/' + 'AddOrReplaceReadGroups.jar'
+    batch = min(batch,len(sortBamFiles))
+    subBams = chunk(sortBamFiles,batch)
+    subGroups = chunk(readgroups,batch)
     sortBams = []
-    cmd = ''
-    for sam,rg in zip(sortBamFiles,readgroups):
-        sortbam = sam[:-3] + 'adrg.bam'
-        sortBams.append(sortbam)
-        readgroup = rg.split('\\t')
-        ID = readgroup[1][3:-1]
-        SM = readgroup[2][3:-1]
-        PL = readgroup[3][3:-1]
-        LB = readgroup[4][3:-1]
-        PU = readgroup[5][3:]
-        cmd = cmd + ('java -jar {addGp} I={input} O={sortbam} '
-                     'RGID={ID} RGSM={SM} RGPL={PL} RGLB={LB} RGPU={PU} & ').format(
-                    addGp=add,input=sam,sortbam=sortbam,ID=ID,SM=SM,PL=PL,LB=LB,
-                    PU=PU)
-    subprocess.check_call(cmd + 'wait',shell=True)
+    for Bams,Groups in zip(subBams,subGroups):
+        cmd = ''
+        for sam,rg in zip(Bams,Groups):
+            sortbam = sam[:-3] + 'adrg.bam'
+            sortBams.append(sortbam)
+            readgroup = rg.split('\\t')
+            ID = readgroup[1][3:-1]
+            SM = readgroup[2][3:-1]
+            PL = 'illumina' #readgroup[3][3:-1]
+            LB = 'lib20000' #readgroup[4][3:-1]
+            PU = 'unit1' #readgroup[5][3:]
+            cmd = cmd + ('java -jar {addGp} I={input} O={sortbam} '
+                         'RGID={ID} RGSM={SM} RGPL={PL} RGLB={LB} RGPU={PU} & ').format(
+                        addGp=add,input=sam,sortbam=sortbam,ID=ID,SM=SM,PL=PL,LB=LB,
+                        PU=PU)
+        subprocess.call(cmd + 'wait',shell=True)
 #     # the file name in sortBams is filename.sort.sort.bam, need to change to filename.sort.bam
 #     final_sort_bams = []
 #     for bam in sortBams:

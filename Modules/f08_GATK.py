@@ -1,54 +1,65 @@
 import subprocess
+def chunk(l,n):
+    n = max(1,n)
+    result = [l[i:i+n] for i in range(0,len(l),n)]
+    return result
 
-def RealignerTargetCreator(gatk,dedupbams,reference,thread,*gold_indels):
+def RealignerTargetCreator(gatk,dedupbams,reference,thread,batch=1,*gold_indels):
     """
     This function creates interval files for realigning.
     Input is deduplicated sorted bam files. reference is 
     fasta file.
     """
+    batch = min(batch,len(dedupbams))
+    subBams = chunk(dedupbams,batch)
     interval_files = []
-    cmd = ''
-    for dedupbam in dedupbams:  #file name is name.dedup.bam
-        interval = dedupbam[:-9] + 'interval.list'
-        interval_files.append(interval)
-        singleCmd =  ('java -jar {gatk} -T RealignerTargetCreator '
-               '-R {ref_fa} -I {dedup} -o {output} -nt {thread}').format(
-                gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval,
-                thread=str(thread))
-        if gold_indels == ():
-            cmd = ('{cmd} {singleCmd} && ').format(cmd=cmd,singleCmd=singleCmd) 
-        else:
-            indel = ''
-            for gold_indel in gold_indels:
-                indel =('{indel} -known {gold}').format(indel=indel,gold=gold_indel)
-            cmd = ('{cmd} {singleCmd} {indel} && ').format(cmd=cmd,singleCmd=singleCmd,
-                                                           indel=indel)
-    subprocess.check_call(cmd[:-3],shell=True)
+    for Bams in subBams:
+        cmd = ''
+        for dedupbam in Bams:  #file name is name.dedup.bam
+            interval = dedupbam[:-9] + 'interval.list'
+            interval_files.append(interval)
+            singleCmd =  ('java -jar {gatk} -T RealignerTargetCreator '
+                   '-R {ref_fa} -I {dedup} -o {output} -nt {thread}').format(
+                    gatk=gatk,ref_fa=reference,dedup=dedupbam,output=interval,
+                    thread=str(thread))
+            if gold_indels == ():
+                cmd = ('{cmd} {singleCmd} & ').format(cmd=cmd,singleCmd=singleCmd) 
+            else:
+                indel = ''
+                for gold_indel in gold_indels:
+                    indel =('{indel} -known {gold}').format(indel=indel,gold=gold_indel)
+                cmd = ('{cmd} {singleCmd} {indel} & ').format(cmd=cmd,singleCmd=singleCmd,
+                                                               indel=indel)
+        subprocess.check_call(cmd + 'wait',shell=True)
     return interval_files
 
-def IndelRealigner(gatk,dedupbams,reference,intervals,*gold_indels):
+def IndelRealigner(gatk,dedupbams,reference,intervals,batch=1,*gold_indels):
     """
     This function realigns the deduped bam file to intervals
     reference is fasta file, target is target interval file.
     """
+    batch = min(batch,len(dedupbams))
+    subBams = chunk(dedupbams,batch)
+    subInter = chunk(intervals,batch)
     realigned_files = []
-    cmd = ''
-    for dedupbam,interval in zip(dedupbams,intervals):
-        realign = dedupbam[:-9] + 'reali.bam'
-        realigned_files.append(realign)
-        singleCmd = ('java -jar {gatk} -T IndelRealigner -R {ref_fa} '
-               '-I {input} -targetIntervals {target} '
-               '-o {output}').format(gatk=gatk,ref_fa=reference,
-                input=dedupbam,target=interval,output=realign)
-        if gold_indels == ():
-            cmd = ('{cmd} {singleCmd} & ').format(cmd=cmd,singleCmd=singleCmd)
-        else:
-            indel = ''
-            for gold_indel in gold_indels:
-                indel =('{indel} -known {gold}').format(indel=indel,gold=gold_indel)
-            cmd = ('{cmd} {singleCmd} {indel} & ').format(cmd=cmd,singleCmd=singleCmd,
-                                                           indel=indel)
-    subprocess.check_call(cmd + 'wait',shell=True)
+    for Bams,Inters in zip(subBams,subInter):
+        cmd = ''
+        for dedupbam,interval in zip(Bams,Inters):
+            realign = dedupbam[:-9] + 'reali.bam'
+            realigned_files.append(realign)
+            singleCmd = ('java -jar {gatk} -T IndelRealigner -R {ref_fa} '
+                   '-I {input} -targetIntervals {target} '
+                   '-o {output}').format(gatk=gatk,ref_fa=reference,
+                    input=dedupbam,target=interval,output=realign)
+            if gold_indels == ():
+                cmd = ('{cmd} {singleCmd} & ').format(cmd=cmd,singleCmd=singleCmd)
+            else:
+                indel = ''
+                for gold_indel in gold_indels:
+                    indel =('{indel} -known {gold}').format(indel=indel,gold=gold_indel)
+                cmd = ('{cmd} {singleCmd} {indel} & ').format(cmd=cmd,singleCmd=singleCmd,
+                                                               indel=indel)
+        subprocess.check_call(cmd + 'wait',shell=True)
     return realigned_files
 
 
@@ -336,110 +347,129 @@ def VQSR_human(gatk,raw_gvcf,reference,thread,hapmap,omni,G1000,dbsnp,mills):
 
 
 ##***************** RNA specific **************************
-def splitN(gatk,dedupBams,ref_fa):
+def splitN(gatk,dedupBams,ref_fa,batch=1):
     """
     This function splits reads due to wrong splicing by STAR
     """
+    batch = min(batch,len(dedupBams))
+    subBams = chunk(dedupBams,batch)
     splitBams = []
-    cmd = ''
-    for dedup in dedupBams:
-        split = dedup[:-9] + 'split.bam'
-        splitBams.append(split)
-        cmd = cmd + ('java -jar {gatk} -T SplitNCigarReads -R {ref_fa} '
-                     '-I {input} -o {output} -rf ReassignOneMappingQuality '
-                     '-RMQF 255 -RMQT 60 -U ALLOW_N_CIGAR_READS && ').format(
-                    gatk=gatk,ref_fa=ref_fa,input=dedup,output=split)
-    subprocess.check_call(cmd[:-3],shell=True)
+    for Bams in subBams:
+        cmd = ''
+        for dedup in Bams:
+            split = dedup[:-9] + 'split.bam'
+            splitBams.append(split)
+            cmd = cmd + ('java -jar {gatk} -T SplitNCigarReads -R {ref_fa} '
+                         '-I {input} -o {output} -rf ReassignOneMappingQuality '
+                         '-RMQF 255 -RMQT 60 -U ALLOW_N_CIGAR_READS & ').format(
+                        gatk=gatk,ref_fa=ref_fa,input=dedup,output=split)
+        subprocess.check_call(cmd + 'wait',shell=True)
     return splitBams
 
-def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference,thread='1'):
+def HaplotypeCaller_RNA_VCF(gatk,recal_files,reference,thread='1',batch=1):
     """
     This function calls variants in RNAseq
     """
+    batch = min(batch,len(recal_files))
+    subBams = chunk(recal_files,batch)
     vcf_files = []
-    cmd = ''
-    for recal in recal_files:
-        vcf = recal[:-9] + 'vcf'
-        vcf_files.append(vcf)
-        cmd = cmd + ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
-        '-I {input} -dontUseSoftClippedBases ' 
-        '-stand_call_conf 20.0 -stand_emit_conf 20.0 -o {output} '
-        '-nct {thread} && ').format(
-        gatk=gatk,ref_fa=reference,input=recal,output=vcf,thread=thread)
-    subprocess.check_call(cmd + 'wait',shell=True)
+    for Bams in subBams:
+        cmd = ''
+        for recal in Bams:
+            vcf = recal[:-9] + 'vcf'
+            vcf_files.append(vcf)
+            cmd = cmd + ('java -jar {gatk} -T HaplotypeCaller -R {ref_fa} '
+            '-I {input} -dontUseSoftClippedBases ' 
+            '-stand_call_conf 20.0 -stand_emit_conf 20.0 -o {output} '
+            '-nct {thread} & ').format(
+            gatk=gatk,ref_fa=reference,input=recal,output=vcf,thread=thread)
+        subprocess.check_call(cmd + 'wait',shell=True)
     return vcf_files
 
-def RNA_Vari_Filter(gatk,vcfs,ref_fa):
+def RNA_Vari_Filter(gatk,vcfs,ref_fa,batch=1):
     """
     This function filter out the results of the vari call 
     """
+    batch = min(batch,len(vcfs))
+    subVcfs = chunk(vcfs,batch)
     filter_files = []
-    cmd = ''
-    for vcf in vcfs:
-        filter_vcf = vcf[:-3] + 'filter.vcf'
-        filter_files.append(filter_vcf)
-        FS = """'FS > 30.0'"""
-        QD = """'QD < 2.0'"""
-        cmd = cmd + ('java -jar {gatk} -T VariantFiltration -R {ref_fa} '
-                     '-V {input} -window 35 -cluster 3 -filterName FS '
-                     '-filter {FS} -filterName QD -filter {QD} '
-                     '-o {output} && ').format(gatk=gatk,ref_fa=ref_fa,
-                    input=vcf,FS=FS,QD=QD,output=filter_vcf)
-    subprocess.check_call(cmd[:-3],shell=True)
+    for Vcfs in subVcfs:
+        cmd = ''
+        for vcf in Vcfs:
+            filter_vcf = vcf[:-3] + 'filter.vcf'
+            filter_files.append(filter_vcf)
+            FS = """'FS > 30.0'"""
+            QD = """'QD < 2.0'"""
+            cmd = cmd + ('java -jar {gatk} -T VariantFiltration -R {ref_fa} '
+                         '-V {input} -window 35 -cluster 3 -filterName FS '
+                         '-filter {FS} -filterName QD -filter {QD} '
+                         '-o {output} & ').format(gatk=gatk,ref_fa=ref_fa,
+                        input=vcf,FS=FS,QD=QD,output=filter_vcf)
+        subprocess.check_call(cmd + 'wait',shell=True)
     return filter_files
 
-def RNA_BaseRecalibrator(gatk,realignbams,reference,gold_vcfs,roundNum,thread):
+def RNA_BaseRecalibrator(gatk,realignbams,reference,gold_vcfs,roundNum,thread='1',batch=1):
     """
     this function does base recalibration
     """
+    batch = min(batch,len(realignbams))
+    subBams = chunk(realignbams,batch)
+    subVcfs = chunk(gold_vcfs,batch)
     # 1. Analyze patterns of covariation in the sequence dataset
-    cmd = ''
     recal_tables = []
-    for realign,gold in zip(realignbams,gold_vcfs):
-        table = realign[:-9] + 'recal.table'
-        recal_tables.append(table)
-        cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
-           '-I {realignbam} -knownSites {gold} '
-           '-o {output} -nct {thread} && ').format(gatk=gatk,ref_fa=reference,
-            realignbam=realign,gold=gold,
-            output=table,thread=thread)
-    subprocess.check_call(cmd[:-3],shell=True)
+    for Bams,Vcfs in zip(subBams,subVcfs):
+        cmd = ''
+        for realign,gold in zip(Bams,Vcfs):
+            table = realign[:-9] + 'recal.table'
+            recal_tables.append(table)
+            cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
+               '-I {realignbam} -knownSites {gold} '
+               '-o {output} -nct {thread} & ').format(gatk=gatk,ref_fa=reference,
+                realignbam=realign,gold=gold,
+                output=table,thread=thread)
+        subprocess.check_call(cmd + 'wait',shell=True)
     
     # 2. Do a second pass to analyze covariation remaining after recalibration
-    cmd = ''
+    subTables = chunk(recal_tables,batch)
     recal_post_tables = []
-    for realign,table,gold in zip(realignbams,recal_tables,gold_vcfs):
-        post_table = realign[:-9] + 'post_recal.table'
-        recal_post_tables.append(post_table)
-        cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
-           '-I {realignbam} -knownSites {gold} -BQSR {table} '
-           '-o {output} -nct {thread} && ').format(gatk=gatk,
-            ref_fa=reference,realignbam=realign,gold=gold,
-            output=post_table,table=table,
-            thread=thread)
-    subprocess.check_call(cmd[:-3],shell=True)
+    for Bams,Tables,Vcfs in zip(subBams,subVcfs,subTables):
+        cmd = ''
+        for realign,table,gold in zip(Bams,Tables,Vcfs):
+            post_table = realign[:-9] + 'post_recal.table'
+            recal_post_tables.append(post_table)
+            cmd = cmd + ('java -jar {gatk} -T BaseRecalibrator -R {ref_fa} '
+               '-I {realignbam} -knownSites {gold} -BQSR {table} '
+               '-o {output} -nct {thread} & ').format(gatk=gatk,
+                ref_fa=reference,realignbam=realign,gold=gold,
+                output=post_table,table=table,
+                thread=thread)
+        subprocess.check_call(cmd + 'wait',shell=True)
     
     # 3. Generate before/after plots
-    cmd = ''
-    for table,post_table in zip(recal_tables,recal_post_tables):
-        plot = table[:-11] + str(roundNum) + 'recal_plots.pdf'
-        cmd = cmd + ('java -jar {gatk} -T AnalyzeCovariates -R {ref_fa} '
-                     '-before {table} -after {post_table} -plots {output} && ').format(
-                    gatk=gatk,ref_fa=reference,table=table,post_table=post_table,
-                    output=plot)
-    subprocess.check_call(cmd[:-3],shell=True)
+    subPostTables = chunk(recal_post_tables,batch)
+    for Tables,postTables in zip(subTables,subPostTables):
+        cmd = ''
+        for table,post_table in zip(Tables,postTables):
+            plot = table[:-11] + str(roundNum) + 'recal_plots.pdf'
+            cmd = cmd + ('java -jar {gatk} -T AnalyzeCovariates -R {ref_fa} '
+                         '-before {table} -after {post_table} -plots {output} & ').format(
+                        gatk=gatk,ref_fa=reference,table=table,post_table=post_table,
+                        output=plot)
+        subprocess.check_call(cmd + 'wait',shell=True)
     
     # 4. Apply the recalibration to your sequence data
-    cmd = ''
+    
     recal_bams = []
-    for realign,table in zip(realignbams,recal_tables):
-        recal_bam = realign[:-9] + 'recal.bam'
-        recal_bams.append(recal_bam)
-        cmd = cmd + ('java -jar {gatk} -T PrintReads -R {ref_fa} '
-        '-I {input} -BQSR {table} -o {output} -nct {thread} && ').format(gatk=gatk,
-        ref_fa=reference,input=realign,table=table,output=recal_bam,
-        thread=thread)
-    subprocess.check_call(cmd[:-3],shell=True)
+    for Bams,Tables in zip(subBams,subTables):
+        cmd = ''
+        for realign,table in zip(Bams,Tables):
+            recal_bam = realign[:-9] + 'recal.bam'
+            recal_bams.append(recal_bam)
+            cmd = cmd + ('java -jar {gatk} -T PrintReads -R {ref_fa} '
+            '-I {input} -BQSR {table} -o {output} -nct {thread} & ').format(gatk=gatk,
+            ref_fa=reference,input=realign,table=table,output=recal_bam,
+            thread=thread)
+        subprocess.check_call(cmd + 'wait',shell=True)
     return recal_bams
     
     

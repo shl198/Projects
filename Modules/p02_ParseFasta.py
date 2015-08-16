@@ -1,16 +1,17 @@
 from Bio import SeqIO
 import os,subprocess
-def change_ncbi_annotation_name(outputfile,inputfile,inter):
+import pandas as pd
+def change_ncbi_annotation_name(inputFa,inter='inter.fa'):
     """
     this function changes the reference name of fasta file to accession number
     eg: change '>gi|614415508|ref|NW_006834731.1| Cricetulus griseus unplaced genomic scaffold, 
     alternate assembly C_griseus_v1.0 C26700950, whole genome shotgun sequence' to 'NW_006834731.1'
     
-    * outputfile: fa file with accession nubmer as sequence name
-    * inputfile: fa file with only name
+    * inputFa: fa file with only name
     * inter: a temp file that stores the interium information, can be any name
+    return fa file with accession nubmer as sequence name
     """
-    reference = SeqIO.parse(open(inputfile,'rU'),'fasta')
+    reference = SeqIO.parse(open(inputFa,'rU'),'fasta')
     output = open(inter,'w')
     for item in reference:
         name =item.id
@@ -19,12 +20,11 @@ def change_ncbi_annotation_name(outputfile,inputfile,inter):
         item.id = name[start+5:end]
         SeqIO.write(item,output,'fasta')
     output.close()
-    os.system("""cut -d ' ' -f 1 %s > %s"""  % (inter,outputfile))
+    outputFile = inputFa[:-2] + 'accession.fa'
+    cmd = ("cut -d \' \' -f 1 {inter} > {out}").format(inter=inter,out=outputFile)
+    subprocess.call(cmd,shell=True)
     os.system('rm ' + inter)
 
-# input = '/data/shangzhong/DetectVirus/Database/150420virus.fa'
-# out = input[:-2]+'gff.fa'; inter= 'test.txt'
-# change_ncbi_annotation_name(out,input,inter)
 
 def remove_duplicate(outputfile,inputfile):
     """
@@ -43,6 +43,7 @@ def remove_duplicate(outputfile,inputfile):
             ref_name.append(item.id)
             SeqIO.write(item,output,'fasta')
     output.close()
+
 
 def change_ensembl_annotation_name(outputfile,inputfile):
     """
@@ -69,7 +70,6 @@ def extractRefseqPr(outputFile,refProteinFile,organism):
     from refseq protein file which include all proteins.
     
     * refProtein: the refseq fasta file proteins
-    
     * organism: organism name, must be the same as ncbi defines
     """
     res = SeqIO.parse(open(refProteinFile,'rU'),'fasta')
@@ -80,13 +80,10 @@ def extractRefseqPr(outputFile,refProteinFile,organism):
             SeqIO.write(item,output,'fasta')
     output.close()
 
-# extractRefseqPr('/data/shangzhong/CHO2Human/mRNA/rna68_human.fna','/data/shangzhong/CHO2Human/mRNA/rna68.fna','Homo sapiens')
-# extractRefseqPr('/data/shangzhong/CHO2Human/mRNA/rna68_cho.fna','/data/shangzhong/CHO2Human/mRNA/rna68.fna','Cricetulus griseus')
-# extractRefseqPr('/data/shangzhong/CHO2Human/mRNA/rna68_mouse.fna','/data/shangzhong/CHO2Human/mRNA/rna68.fna','Mus musculus')
 
 def embl2fasta(in_embl,out_fa):
     """
-    This function convert embl file format to fasta format
+    This function converts embl file format to fasta format
     
     * in_embl: input embl format sequence file
     * out_fa: output fasta format sequence file
@@ -126,3 +123,45 @@ def fq2fa(fqs):
             fas.append(fa+'.gz')
 
     return fas
+
+def splitFa(inputFile,maxItem):
+    """
+    This function split fa file into several files.
+    
+    * inputFile: str. Fasta file name
+    * maxItem: int. Number of items in each files
+    """
+    n = 0;suffix=1
+    fa = SeqIO.parse(open(inputFile,'rU'),'fasta')
+    out = inputFile[:-3] + str(suffix) + '.fa'
+    outHandle = open(out,'w')
+    for record in fa:
+        if n == maxItem:
+            n = 0
+            outHandle.close()
+            suffix = suffix + 1
+            out = inputFile[:-3] + str(suffix) + '.fa'
+            outHandle = open(out,'w')
+        else:
+            SeqIO.write(record,outHandle,'fasta')
+            n = n + 1
+    outHandle.close()
+    
+
+def chrLength(fa):
+    """
+    This functions generates two column file, 1st is chromosome name,
+    2nd is chromosome length
+    
+    * fa: str. Fasta file
+    """
+    len_dic = {}
+    handle = open(fa,'r')
+    chrs = SeqIO.parse(handle,'fasta')
+    for chrome in chrs:
+        len_dic[chrome.id] = len(chrome.seq)
+    df = pd.DataFrame(len_dic.items(),columns=['Chr','Length'])
+    out = fa[:-3] + '_ChrLen.txt'
+    df.to_csv(out,sep='\t',index=False)
+# fa= '/data/shangzhong/RibosomeProfiling/Database/combined.fa'
+# chrLength(fa)

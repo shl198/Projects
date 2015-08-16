@@ -1,0 +1,52 @@
+# This file includes all parameters that need to be set for all pipelines.
+# For paired end fastq files, make sure the file name is in the format
+# name1.fq.gz, name2.fq.gz or name1.fastq.gz, name2.fastq.gz
+
+##===============  global parameters ================================
+thread	1
+	# number of threads
+
+
+email	shl198@ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	end
+	# message which will be sent to email when pipeline finishes
+
+
+filePath	/path/to/fastq/files/folder
+	# folder where fastq files locate
+
+
+sailfish_index	/path/to/sailfish/index
+	# index of refSequence for aligner to be used
+
+
+libtype	library type of fq files
+	# library type of fq files in sailfish
+
+
+trim	False
+	# choose whether to trim the origional fastq files
+
+
+phred	33
+	# encoding score for raw data.
+	# other option: 64
+	# If RNAseq encode version is less than 1.8, it is recommend to trim the data.
+
+
+trimmomatic	/home/shangzhong/Installation/Trimmomatic-0.32/trimmomatic-0.32.jar
+	# trimmomatic pathway
+
+
+trimmoAdapter	
+	# trimmomatic adapter files
+
+

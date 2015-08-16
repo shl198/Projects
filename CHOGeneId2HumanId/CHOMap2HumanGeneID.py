@@ -53,4 +53,4 @@ finalmRNA = intersectMapping(mRNAres[0],mRNAres[1],sep =',')
 outputFile = '/data/shangzhong/CHO2Mouse/finalMergeWithmRNA.txt'
 finalbyname = '/data/shangzhong/CHO2Mouse/MergeMapping.furtherMerge.final.txt'
 finalMerge = MergeBasedOnSignificance(outputFile,finalbyname,finalmRNA) # [finalMergeWithmRNA.txt,finalMergeWithmRNA.unmap.txt]
-finalbyname = extendByName(finalMerge[0],name_result[1])  # MergeMapping.furtherMerge.final.txt
+finalbyname = extendByName(finalMerge[0],name_result[1])  # finalMergeWithmRNA.final.txt

@@ -63,8 +63,8 @@ def rg_bams(rgs,bamfiles):
     # build a dic, key is sample name, value is bam file
     for rg,bam in zip(rgs,bamfiles):
         start = rg.index('SM:')
-        end = rg.index('PL:')
-        sample = rg[start+3:end-3]
+#         end = rg.index('PL:')
+        sample = rg[start+3:]
         if sample in readic:
             readic[sample].append(bam)
         else:
@@ -97,4 +97,17 @@ def changeFastqReadName(fastqFiles):
     subprocess.check_call(cmd[:-3],shell=True)
 
 
-
+def fastqc(filepath,batch):
+    """
+    This function runs fastqc for fastq files.
+    
+    * filepath: str. filepath where fastq files exist.
+    * batch: int. Indicate how many files process at the same time each batch.
+    """
+    files = [f for f in os.listdir(filepath) if f.endswith('.fq.gz') or f.endswith('.fastq.gz')]
+    rounds = len(files)/batch
+    for i in range(rounds):
+        cmd = ''
+        for j in range(batch):
+            cmd = cmd + ('fastqc {f} & ').format(f=files[batch*i+j])
+        subprocess.call(cmd[:-3]+' wait ',shell=True)

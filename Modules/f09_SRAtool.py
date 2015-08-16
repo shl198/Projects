@@ -11,6 +11,8 @@ def list_sra(path):
 def sra2fastq(sraFiles):
     """
     This file transfer sra files to fastq files
+    
+    * sraFiles: list. A list of sra files
     """
     cmd = ''
     for sra in sraFiles:

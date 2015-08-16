@@ -40,6 +40,7 @@ snpEff /path/snpEff.jar
 
 genome	genome name
 	# must be same as in the snpeff configure file
+	# eg: in file it shows 'chok1201405.genome : CHOk1', the name should be chok1201405
 
 
 provean	/path/provean.sh

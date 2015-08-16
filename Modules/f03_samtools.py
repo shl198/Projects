@@ -1,7 +1,31 @@
 import subprocess
+import re
+def extractBamWithLength(sam,length):
+    handle = open(sam,'r')
+    out = sam[:-3]+str(length)+'.sam'
+    outHandle = open(out,'w')
+    for line in handle:
+        sum_nt = 0
+        item = line[:-1].split('\t')
+        cigar = item[5]
+        num_map = re.findall('\d+|\D+', cigar)
+        for i in range(len(num_map)):
+            if num_map[i] == 'M':
+                sum_nt = sum_nt + int(num_map[i-1])
+        if sum_nt == length:
+            outHandle.write(line)
+    outHandle.close()
+    
+    
 def sam2bam_sort(samfiles,thread=1,sortType=''):
     """
     This function will change sam file to bam file and sort bam files
+    
+    * samfiles:list. A list of sam files
+    * thread: int. Number of thread
+    * sortType: str. Default: '' which means sort by position. Alter: name
+    
+    return sorted bam file
     """
     sorted_files = []
     sam2bamCmd=''
@@ -38,7 +62,31 @@ def sam2bam_sort(samfiles,thread=1,sortType=''):
     subprocess.check_call(indexCmd + 'wait',shell=True)
     subprocess.check_call(rmBamCmd + 'wait',shell=True)
     return sorted_files
- 
+
+
+def sortBam(bamFiles,thread=1,sortType=''):
+    """
+    This function sort bam files
+    """
+    if sortType == 'name':
+            tag = ' -n'
+    else:
+        tag = ''
+    cmd = ''
+    sortBams = []
+    for bam in bamFiles:
+        sort = bam[:-3] + 'sort'
+        sort_bam = sort + '.bam'
+        sortBams.append(sort_bam)
+        sortCmd = ('samtools sort{tag} -m 4G -@ {thread} -T {sort} {bam} '
+                   '-o {sortbam} && ').format(tag=tag,thread=thread,sort=sort,
+                                              bam=bam,sortbam=sort_bam)
+        cmd = cmd + sortCmd
+    subprocess.call(cmd[:-3],shell=True)
+    return sortBams
+import os
+
+
 def bam2sam(bamfiles):
     """
     This function will transfer bam file to sam files
@@ -55,14 +103,15 @@ def bam2sam(bamfiles):
     return samFiles
 #===========================================================================
 #===========================================================================
-def extract_bam(sortedBamFiles,extractType,seqType='pair',thread=1):
+def extract_bam(sortedBamFiles,extractType,seqType='',thread=1):
     """
     This function extract the mapped/unmapped reads from the bam file which 
     is got from mapping using aligners. 
     
-    * sortedBamFiles: a list of bam files
-    * extractType: default(map), other(unmap)
-    * thread: number of threads
+    * sortedBamFiles: list. A list of bam files
+    * extractType: str. default(map), other(unmap)
+    * seqType: str. 'pair' or 'single'
+    * thread: int. number of threads
     """
     if seqType == 'single':
         sam_tag = '4'
@@ -87,6 +136,7 @@ def extract_bam(sortedBamFiles,extractType,seqType='pair',thread=1):
     
     return returnFile
 
+
 def merge_bam(bamfiles,outputbam):
     """
     this function merges bam files into one
@@ -103,7 +153,17 @@ def index_bam(bamFiles):
     cmd = ''
     for bam in bamFiles:
         cmd = cmd + 'samtools index {bam} & '.format(bam=bam)
-    subprocess.check_call(cmd + 'wait',shell=True)
-    print 'done'
+    subprocess.call(cmd + 'wait',shell=True)
     
+
+def flagstat(bamFiles):
+    """
+    This function calculates basic mapping results of bam file(% of reads mapping,etc)
+    
+    * bamFiles: list. A list of bam files
+    """
+    cmd = ''
+    for bam in bamFiles:
+        cmd = cmd + 'samtools flagstat {bam} && '.format(bam=bam)
+    subprocess.call(cmd[:-3],shell=True)
     
