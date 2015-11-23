@@ -1,5 +1,6 @@
 import subprocess
 import re
+import os
 def extractBamWithLength(sam,length):
     handle = open(sam,'r')
     out = sam[:-3]+str(length)+'.sam'
@@ -19,9 +20,9 @@ def extractBamWithLength(sam,length):
     
 def sam2bam_sort(samfiles,thread=1,sortType=''):
     """
-    This function will change sam file to bam file and sort bam files
+    This function will change sam/bam file to sorted bam file
     
-    * samfiles:list. A list of sam files
+    * samfiles:list. A list of sam/bam files
     * thread: int. Number of thread
     * sortType: str. Default: '' which means sort by position. Alter: name
     
@@ -39,10 +40,11 @@ def sam2bam_sort(samfiles,thread=1,sortType=''):
         sort_bam = sort + '.bam'
         sorted_files.append(sort_bam)
         # sam file to bam file
-        sam2bamCmd = sam2bamCmd + ('samtools view -@ {thread} -bS {sam} '
-                                   '-o {bam} && ').format(sam=sam, bam=bam,thread=thread)
-        # remove sam file
-        rmSamCmd = rmSamCmd + 'rm {sam} & '.format(sam=sam)
+        if sam.endswith('sam'):
+            sam2bamCmd = sam2bamCmd + ('samtools view -@ {thread} -bS {sam} '
+                                       '-o {bam} && ').format(sam=sam, bam=bam,thread=thread)
+            # remove sam file
+            rmSamCmd = rmSamCmd + 'rm {sam} & '.format(sam=sam)
         # sort bam file
         if sortType == 'name':
             tag = ' -n'
@@ -55,8 +57,9 @@ def sam2bam_sort(samfiles,thread=1,sortType=''):
         indexCmd = indexCmd + 'samtools index {sortbam} & '.format(sortbam=sort_bam)
         # remove unsorted bam file
         rmBamCmd = rmBamCmd + 'rm {bam} & '.format(bam=bam)
-        
-    subprocess.check_call(sam2bamCmd[:-3],shell=True)    
+
+    if samfiles[0].endswith('sam'):
+        subprocess.check_call(sam2bamCmd[:-3],shell=True)    
     subprocess.check_call(rmSamCmd[:-3],shell=True)
     subprocess.check_call(sortBamCmd[:-3],shell=True)
     subprocess.check_call(indexCmd + 'wait',shell=True)
@@ -84,7 +87,7 @@ def sortBam(bamFiles,thread=1,sortType=''):
         cmd = cmd + sortCmd
     subprocess.call(cmd[:-3],shell=True)
     return sortBams
-import os
+
 
 
 def bam2sam(bamfiles):

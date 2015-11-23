@@ -9,7 +9,7 @@ sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from Modules.f00_Message import Message
 from Modules.f01_list_trim_fq import list_files,Trimmomatic
-from Modules.f02_aligner_command import gsnap,STAR
+from Modules.f02_aligner_command import gsnap,STAR,STAR_Db
 from Modules.f03_samtools import sam2bam_sort,flagstat
 from Modules.f04_htseq import htseq_count
 from Modules.f05_IDConvert import geneSymbol2EntrezID
@@ -50,19 +50,22 @@ fastqFiles = list_files(file_path)
 print 'list file succeed'
 if trim == 'True':
     try:
-        fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter)
+        fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter,batch=6)
         print 'trim succeed'
         print 'fastqFiles is: ',fastqFiles
     except:
         print 'trim failed'
         Message('trim failed',email)
         raise
-#=========== (2) run gsnap to do the mapping ========
+#=========== (2) run STAR to do the mapping ========
 try:
     if aligner == 'gsnap':
         map_files = gsnap(fastqFiles,db_path, db_name,gsnap_annotation,thread)
     else:
-        map_files = STAR(fastqFiles,db_path,thread)
+        if not os.path.exists(db_path): os.mkdir(db_path)
+        if os.listdir(db_path) == []:
+            STAR_Db(db_path,ref_fa,thread)
+        map_files = STAR(fastqFiles,db_path,thread,annotation,['--outSAMtype BAM SortedByCoordinate','--quantMode GeneCounts'])
     print 'align succeed'
     print 'map_files is: ',map_files
 except:

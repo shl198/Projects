@@ -16,8 +16,8 @@ from Modules.f12_trinity import Trinity
 from a01_blast2fasta import blast2fa,merge_fa
 from Modules.p04_ParseBlast import annotateBlast
 #=============  define some parameters  ===================
-#parFile = sys.argv[1]
-parFile = '/data/shangzhong/DetectVirus/Brain/01_DetectVirus_Parameters.txt'
+parFile = sys.argv[1]
+#parFile = '/data/shangzhong/DetectVirus/Brain/01_DetectVirus_Parameters.txt'
 param = get_parameters(parFile)
 thread = param['thread']
 email = param['email']
@@ -193,10 +193,10 @@ try:
     print 'blastFas is: ', blastFas
     remove(virus_blast)
 except:
-    print 'extract reads from lbast tabular txt failed'
+    print 'extract reads from blast tabular txt failed'
     Message('extract reads from blast tabular txt failed',email)
     raise
-#========  (8) merge blast mapped with gsnap mapped ==========================
+#========  (8) merge blast mapped with gsnap/STAR mapped ==========================
 try:
     mergedFa = merge_fa(seqType,only2virus_faFiles,blastFas)
     print 'merge fa files for Trinity succeed'

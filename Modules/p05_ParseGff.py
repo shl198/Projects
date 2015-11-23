@@ -35,7 +35,7 @@ def extract_gff4cufflink_symbol2ID(outputFile,gffFile,source,transcript='no',pro
     * outputFile: outputFile name
     * gffFile: gffFile name from ncbi or ensembl
     * source: str. annotation file source. eg: 'ncbi','ensembl'
-    return a file with 3 columns: [id,symbol,chromosome] or 4 columsn: [id,symbol,chromosome,trid/prid]
+    return a file with 3 columns: [id,symbol,chromosome] or 4 columns: [id,symbol,chromosome,trid/prid]
     """
     handle = open(gffFile,'r')
     #columns = ['GeneID','GeneSymbol','GeneAccession']
@@ -78,6 +78,8 @@ def extract_gff4cufflink_symbol2ID(outputFile,gffFile,source,transcript='no',pro
             except:
                 continue
             outline = [trID,trAc]
+        else:
+            outline = []
         if protein == 'yes':
             if item[2] != 'CDS': continue
         # get protein accession number
@@ -101,6 +103,8 @@ def extract_gff4cufflink_symbol2ID(outputFile,gffFile,source,transcript='no',pro
             except:
                 continue
             outline = [trID,prid]
+        else:
+            outline = []
         # get gene id
         try:
             index = des.index(geneID)
@@ -177,15 +181,19 @@ def extractAllPr(gffFile,feature='CDS',out=''):
         if item[2] != feature:
             continue
         try:
-        # get protein id
+        # get feature id
+            if feature=='CDS':
+                pattern = 'protein_id='
+            if feature=='exon':
+                pattern = 'transcript_id='
             prid = ''
-            index = line.index('protein_id=')
-            index = index + 11
+            index = line.index(pattern)
+            index = index + len(pattern)
             while line[index] not in ['\n',';']:
                 prid = prid + line[index]
                 index = index + 1
         except:
-            print line, 'dont have prid'
+            print line, 'dont have feature id'
             continue
         try:
             # get gene id
@@ -202,15 +210,20 @@ def extractAllPr(gffFile,feature='CDS',out=''):
         out_handle.write(outline)
     gff_handle.close()
     out_handle.close()
-    df = pd.read_csv(out,sep='\t',header=None,names=['Chr','cds_start','cds_end','GeneID','Pr_Access','Strand'])
+    if feature == 'CDS':
+        start = 'cds_start'; stop = 'cds_end';access='Pr_Access'
+    else:
+        start = 'ex_start'; stop = 'ex_end';access = 'Tr_Access'
+    df = pd.read_csv(out,sep='\t',header=None,names=['Chr',start,stop,'GeneID',access,'Strand'])
     df = df.drop_duplicates()
-    df = df.sort(['Pr_Access','cds_start'])
+    df = df.sort([access,start])
+    df[start] = df[start] - 1
     #df['Chr'] = df['Chr'].astype(str).apply(lambda x: removeIDVersion(x))
     #df['Pr_Access'] = df['Pr_Access'].astype(str).apply(lambda x: removeIDVersion(x))
     df['GeneID'] = df['GeneID'].astype(str)
     df.to_csv(out,index=False,sep='\t')
 # gffFile = '/data/shangzhong/RibosomeProfiling/Database/combined.gff'
-# extractAllPr(gffFile,feature='CDS',out='/data/shangzhong/RibosomeProfiling/cho_pr/10_pr_cds.txt')
+# extractAllPr(gffFile,feature='exon',out='/data/shangzhong/RibosomeProfiling/cho_pr/10_rna_exon.txt')
 
 #===============================================================================
 #                      some basic sequence process

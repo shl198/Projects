@@ -50,6 +50,8 @@ def vcf2input4provean(filteredVCF,record_dict,gffFile,CodonFile):
     
     * filteredVCF: vcf file filtered using snpSift
     * record_dict: 
+    * gffFile: str. annotation filename.
+    * CodonFile: str. 
     """
     vcf_df = pd.read_csv(filteredVCF,sep='\t')
     if vcf_df.empty:

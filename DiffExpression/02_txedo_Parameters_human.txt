@@ -3,7 +3,7 @@
 # name1.fq.gz, name2.fq.gz or name1.fastq.gz, name2.fastq.gz
 
 ##===============  global parameters ================================
-thread	1
+thread	19
 	# number of threads
 
 
@@ -20,31 +20,29 @@ endMessage	end
 	# message which will be sent to email when pipeline finishes
 
 
-dataSource	ncbi
-	# reference and gff data source
-	# can also be ensembl
-
-
-refSequence	/path/to/ref/fasta/file
+refSequence	/data/shangzhong/Database/human/GRCh38.p2.genome.fa
 	# fasta file of target organism
 
 
-filePath	/path/to/fastq/files/folder
+filePath	/data/shangzhong/DE/sjoerd
 	# folder where fastq files locate
 
 
-alignerDb	/path/to/aligner/database
+alignerDb	/data/shangzhong/Database/human/STAR_HumanDb
 	# index of refSequence for aligner to be used
 
 
-trim	False
+trim	True
 	# choose whether to trim the origional fastq files
 
 
 phred	33
 	# encoding score for raw data.
 	# other option: 64
-	# If RNAseq encode version is less than 1.8, it is recommend to trim the data.
+
+
+picard	/home/shangzhong/Installation/picard-tools-1.121
+	# picard folder pathway
 
 
 trimmomatic	/home/shangzhong/Installation/Trimmomatic-0.32/trimmomatic-0.32.jar
@@ -55,26 +53,25 @@ trimmoAdapter
 	# trimmomatic adapter files
 
 
-aligner	/aligner/to/use
+#----------------- Differential Expression pipeline ------------------
+aligner	STAR
 	# set aligner to run the pipeline, gsnap and start recomended
 
 
-annotation	/path/to/annotation/gff3/file
+annotation	/data/shangzhong/Database/human/gencode.v22.chr_patch_hapl_scaff.annotation.gff3
 	# annotation file for organism
 
 
-htseqOutPath	/path/to/store/htseqCount/file
-	# pathway in which the htseq count files stores
+gsnapDbName	name
+	# for gsnap need to set this parameter
 
 
-gsnapDbName	/db/name/for/gsnap
-	# If you use gsnap, you need to set this parameter
-
-
-gsnapAnnotation	/gsnap/annotation/file
+gsnapAnnotation	name.splicesites.iit
 	# annotaton file for gsnap
 
 
-symbolIDFile	/path/to/files/stores/genesymbol/geneid/mapping
-	# This is mainly applied when data source is from ncbi and you want entez gene id. If set, the file should has two columns, first is gene symbol, second is gene entrez id.
+symbolIDFile	/data/shangzhong/Database/human/20150522gene2ensembl_gene_ensemble.human.txt
+	# if set, the file to convert gene symbol to gene id
 
+IDresource	ensembl
+	# id resource

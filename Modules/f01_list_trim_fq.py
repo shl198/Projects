@@ -62,7 +62,7 @@ def list_files(file_path):
 
     return fastqFiles
 
-def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):
+def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):  # batch means number of analysis run together in parallel in each batch
     """
     this function trims fastq files using Trimmomatic
     """
@@ -96,7 +96,7 @@ def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):
                     adaptCmd = 'ILLUMINACLIP:{adapter}:2:30:10 '.format(adapter=adapter_file)
                 else:
                     adaptCmd = ''
-                trimCmd2nd = 'SLIDINGWINDOW:5:10 LEADING:15 TRAILING:10 MINLEN:25 TOPHRED33 & '
+                trimCmd2nd = 'SLIDINGWINDOW:5:10 LEADING:5 TRAILING:3 MINLEN:22 TOPHRED33 & '
                 cmd = cmd + trimCmd1st + adaptCmd + trimCmd2nd
         print cmd
         subprocess.call(cmd + 'wait',shell=True)

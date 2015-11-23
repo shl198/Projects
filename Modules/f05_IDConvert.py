@@ -13,14 +13,14 @@ def geneSymbol2EntrezID(DictFile,output_path,inputpath,sym2ID='yes'):
     """
     This fuction converts gene symbol in htseq-count file to entriz_gene_ID, and ID to symbol
     
-    * Dict: Convert file. 1st column is ID, 2nd column is symbol
+    * Dict: Convert file. 1st column is ID, 2nd column is symbol. eg: /data/shangzhong/Database/cho/gff_chok1_ID_symbol.txt
     * output_path: a folder stores all the files end with sort.Count.txt 
     * inputpath: a folder stores all the htseq count files.
     * sym2ID: if yes: symbol to ID
               if no : ID to symbol
     """
     allFiles = os.listdir(inputpath)
-    filelist = [f for f in allFiles if f.endswith('.sort.txt')]
+    filelist = [f for f in allFiles if f.endswith('.txt')]
     #=========== build dictionary ============
     dic = {}
     result = open(DictFile,'r')
@@ -43,12 +43,14 @@ def geneSymbol2EntrezID(DictFile,output_path,inputpath,sym2ID='yes'):
                 output.write('\t'.join(item))
             except:
                 output.write('\t'.join(item))
-                print item[0]
+                print item[0],'does not have the mapping ids'
         result.close()
         output.close()
         os.remove(inputpath + '/' + filename)
 
-
+# DictFile = '/data/shangzhong/Database/cho/gff_chok1_ID_symbol.txt'
+# output_path = inputpath = '/data/shangzhong/RibosomeProfiling/TotalRNA_align/htseq'
+# geneSymbol2EntrezID(DictFile,output_path,inputpath,sym2ID='yes')
 #===============================================================================
 #           This part is for cufflinks
 #===============================================================================
@@ -74,19 +76,25 @@ def addEntrezGeneID2CufflinkResultWithEnsemblAnnotation(ConvertFile,geneFpkmFile
             mappedIDs.append(geneID)
         except:
             mappedIDs.append('-')
-    cuffData.insert(0, 'EntrezGeneID', pd.Series(mappedIDs) )
+    cuffData.insert(0, 'EntrezID', pd.Series(mappedIDs) )
      
-    outputFile = geneFpkmFile + '.csv'
-    cuffData.to_csv(outputFile)
-    print 'done'
-
+    outputFile = geneFpkmFile + '.txt'
+    cuffData.to_csv(outputFile,sep='\t')
+    return outputFile
+# ConvertFile = '/data/shangzhong/Database/human/20150522gene2ensembl_gene_ensemble.human.txt'
+# geneFpkmFile = '/data/shangzhong/DE/sjoerd/trim_KBM7_1_cufflinks/genes.fpkm_tracking'
+# new = addEntrezGeneID2CufflinkResultWithEnsemblAnnotation(ConvertFile,geneFpkmFile)
+# df = pd.read_csv(new,sep='\t',header=0)
+# df = df[['EntrezID','FPKM']].groupby(['EntrezID']).sum()
+# df.to_csv(new,sep='\t')
 
 def addEntrezID2CufflinkResultWithNCBIAnnotation(ConvertFile,geneFpkmFile):
     """
     This function converts the gene symbols to gene id in cufflinks results
     and then return a file with two columns:1st Entrez geneID, 2nd FPKM
     
-    * ConvertFile:str. Filename of the id file, first 3 columns should be 'GeneID','GeneSymbol,'Acession'
+    * ConvertFile:str. Filename of the id file, first 3 columns should be 'GeneID','GeneSymbol,'Acession'.
+                       Chromosome Accession is necessary because some gene ids map to many chromosomes.
     * geneFpkmFile:str. Filename of cufflink genefpkmfile.
     
     return the new filename with id added, it's in the same folder with geneFpkmFile.
@@ -110,20 +118,21 @@ def addEntrezID2CufflinkResultWithNCBIAnnotation(ConvertFile,geneFpkmFile):
         except:
             geneIDs.append(symbol)
     cuffData.insert(0,'Entrez_ID',pd.Series(geneIDs))
-#     # remove the duplicates
-#     res_df = cuffData.drop_duplicates(['tracking_id','gene_short_name'])
-#     cuffData_sort = res_df.sort(['Entrez_ID','gene_short_name'])
     cuffData.to_csv(outputFile,sep='\t',index=False)
-    
     return outputFile
-# pathway = '/data/shangzhong/DE/k1'
+
+# pathway = '/data/shangzhong/DE/fpkm/01_result'
 # os.chdir(pathway)
 # folders = [f for f in os.listdir(pathway) if os.path.isdir(os.path.join(pathway, f))]
 # folders.sort()
 # for folder in folders:
 #     geneFpkmFile = folder + '/genes.fpkm_tracking'
-#     addEntrezID2CufflinkResultWithNCBIAnnotation('/data/shangzhong/Database/gff_chok1_ID_symbol_accession.txt',
+#     new_res_file = addEntrezID2CufflinkResultWithNCBIAnnotation('/data/shangzhong/Database/cho/gff_chok1_ID_symbol_accession.txt',
 #                        geneFpkmFile)
+#     df = pd.read_csv(new_res_file,sep='\t',header=0)
+#     df = df[['Entrez_ID','FPKM']].groupby(['Entrez_ID']).sum()
+#     df.to_csv(new_res_file,sep='\t')
+    
 def addProduct2CufflinkResultWithNCBIAnnotation(ConvertFile,geneFpkmFile):
     """
     This function insert the product name of gene into the 1st column of cufflinks results
@@ -158,6 +167,7 @@ def addGeneIDorNameForDESeqResult(InFile,MapFile,addType='gene_id',IDVersion='no
     
     * InFile: str. Filename of the DESeq result. eg: filename.csv
     * MapFile: str. Filename for storing the mapping information. 1st column is gene id, 2nd is gene symbol.
+                        eg: /data/shangzhong/Database/cho/gff_chok1_ID_symbol.txt
     * addType: str. If 'gene_id', then add gene id, if 'gene_symbol' then add name
     * IDVersion: str. If gene id has version information (eg:ESN00001.1 indicats version 1)
     
@@ -213,11 +223,8 @@ def extract_from_gene2ref(filename,taxID,organism,columnNum=[]):
     This file extracts rows by taxonomy id, and columns from the ncbi gene2refseq file. 
     
     * filename: 'gene2ref.gz' or 'gene2ref'
-    
     * taxID: integer indicates taxonomy id of interested organism.
-    
     * organism: name of organism to be extracted
-    
     * columnNums: a list of columns to extract
     """
     taxID = str(taxID)

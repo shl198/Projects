@@ -10,69 +10,10 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from multiprocessing import Process
 mpl.style.use('ggplot')
-#===============================================================================
-#  read and merge fastq files: usually applied to CHO data from Denmark
-#===============================================================================
-# import os,subprocess
-# path = '/media/lewislab/Dropbox (UCSD SBRG)/LewisPub/Data/RNAseq/2014_11_CHOS_baseline/B.Voldborg_14_05'
-# os.chdir(path)
-# folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
-# folders = natsorted(folders)
-# target_path = '/data/shangzhong/DE/chos_base'
-# folders = folders[20:40]
-# for f in folders:
-# 	subfolder = os.listdir(f)
-# 	files = os.listdir(f+'/'+subfolder[0])
-# 	fir = []
-# 	snd = []
-# 	for filename in files:
-# 		if filename.endswith('_1.fastq.gz'):
-# 			fir.append(f + '/' + subfolder[0] + '/' + filename)
-# 		if filename.endswith('_2.fastq.gz'):
-# 			snd.append(f + '/' + subfolder[0] + '/' + filename)
-# 	cmd = 'cat ' + ' '.join(fir) + ' > ' + target_path + '/' + f + '_1.fq.gz'
-# 	subprocess.call(cmd,shell=True)
-# 	cmd = 'cat ' + ' '.join(snd) + ' > ' + target_path + '/' + f + '_2.fq.gz'
-# 	subprocess.call(cmd,shell=True)
+import pysam
+from Bio.Seq import Seq
 
 
-#===============================================================================
-#                 merge cufflinks
-#===============================================================================
-
-# filepath = '/data/shangzhong/DE/pgsa/cufflinks'
-# 
-# os.chdir(filepath)
-# folders = [f for f in os.listdir(filepath) if os.path.isdir(os.path.join(filepath,f))]
-# folders = natsorted(folders)
-# ConvertFile = '/data/shangzhong/Database/gff_chok1_ID_symbol_accession.txt'
-# # start merge
-# data = pd.read_csv(folders[0] +'/genes.fpkm_tracking',sep='\t',header=0,usecols=[0,4,6,9],names=['tracking_id','gene_short_name','locus',folders[0]])
-# data['index'] = data['tracking_id'].map(str) + data['gene_short_name'] + data['locus']
-# data = data.set_index(['index'])
-# for i in range(1,len(folders)):
-#     df = pd.read_csv(folders[i] +'/genes.fpkm_tracking',sep='\t',header=0,usecols=[0,4,6,9],names=['tracking_id','gene_short_name','locus',folders[i]])
-#     df['index'] = df['tracking_id'].map(str) + df['gene_short_name'] + df['locus']
-#     df = df.set_index(['index'])
-#     df = df[folders[i]]
-#     data = pd.concat([data,df],axis=1)
-# 
-# data.to_csv(filepath + '/sample_FPKM.csv',sep='\t',index=False)
-
-#===============================================================================
-#               Read winzeler fastq files
-#===============================================================================
-# folders = [f for f in os.listdir(filepath) if os.path.isdir(os.path.join(filepath,f))]
-# folders = natsorted(folders)
-# n = 1
-# for folder in folders:
-#     os.chdir(os.path.join(filepath,folder))
-#     files = [f for f in os.listdir(filepath+'/'+folder) if f.endswith('fastq.gz')]
-#     
-#     cmd = ('cat {f} > {out}').format(f=' '.join(files),out='/data/shangzhong/DE/Winzeler/sample0'+str(n)+'.fq.gz')
-#     subprocess.call(cmd,shell=True)
-#     print cmd
-#     n = n +1
 
 
 #===============================================================================
@@ -98,11 +39,83 @@ mpl.style.use('ggplot')
 # res.to_csv('/data/shangzhong/pgsa.csv',index=False,sep='\t')
 
 
-from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
-my_dna = Seq("AGTACACTGGT", generic_dna)
-print my_dna.complement()
-print my_dna.translate()
+# change name
+# path = '/data/shangzhong/DE/fpkm/change_name'
+# os.chdir(path)
+# folders = [f for f in os.listdir(path) if os.path.isdir(f)]
+# folders = natsorted(folders)
+# for f in folders:
+#     item =  f.split('_')
+#     new_name = '_'.join(['base',item[1],item[2]])
+#     os.rename(f,new_name)
+
+
+
+# import pybedtools as pybed
+# cdsFile = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/db/01_pr_cds.txt'
+# df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)
+# df.to_csv('inter.bed',sep='\t',header=None,index=False)
+# a = pybed.BedTool('inter.bed')
+# c = a.merge(c='4,5,6',o='distinct,distinct,distinct')
+# os.remove('inter.bed')
+# merge_df = pd.read_csv(c.fn,sep='\t',header=None,names=['chr','start','end','geneid','praccess','strand'])
+# cri = merge_df['strand'].map(lambda x: ',' in x)
+# overlapped_region = merge_df[cri] 
+# print 'done'
+
+def chunks(l, n):
+    n = max(1, n)
+    return [l[i:i + n] for i in range(0, len(l), n)]
+
+# fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/04_gene_total_count/s05_cov_geneCount.txt'
+# df = pd.read_csv(fn,sep='\t',header=0)
+# df = df.sort(['count'])
+# gene = df['GeneID'].tolist()
+# gene.reverse()
+# pr_fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/03_pr_pos_cov/s05_cov_prpos.txt'
+# tr_fn = '/data/shangzhong/RibosomeProfiling/TotalRNA_align/03_tr_pos_cov/s02_cov_trpos.txt'
+# handle1 = open(pr_fn,'r')
+# handle2 = open(tr_fn,'r')
+# g = gene[24]  # 7
+# color = 'black'
+# print g
+# for line in handle1:
+#     item = line[:-1].split('\t')
+#     if item[0] == g:
+#         cov = item[2:]
+#         cov = [int(p) for p in cov]
+#         cover = cov
+#         n = 19#len(cover)
+#         plt.figure()
+#         plt.bar(range(n),cover[-19:],width=1.0,facecolor=color, edgecolor=color)
+#         plt.ylim(0,1000)
+#         plt.xlabel(g+'_pr')
+#         break
+# for line in handle2:
+#     item = line[:-1].split('\t')
+#     if item[0] == g:
+#         cov = item[3:]
+#         cov = [int(p) for p in cov]
+#         cover=cov
+#         cover = chunks(cov,3)
+#         cover = [sum(p) for p in cover]
+#         n = len(cover)
+#         plt.figure()
+#         plt.bar(range(312),cover[-312:],width=1.0,facecolor=color, edgecolor=color)
+#         plt.ylim(0,450)
+#         plt.xlabel(g+'_tr')
+#         break        
+# plt.show()
+fn = '/home/shangzhong/pr_pos.txt'
+handle = open(fn,'r')
+for line in handle:
+    item = line.split(',')
+    print len(item)
+    cov = [int(p) for p in item]
+    plt.figure()
+    plt.bar(range(50),cov[:50],width=1.0,facecolor='black',edgecolor='black')
+    plt.ylim(0,60)
+    plt.show()
 
 
 

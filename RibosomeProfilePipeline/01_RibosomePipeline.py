@@ -11,6 +11,7 @@ from Modules.f01_list_trim_fq import list_files,Trimmomatic
 from Modules.p01_FileProcess import remove,get_parameters,rg_bams
 from Modules.f02_aligner_command import bowtie2,tophat
 from Modules.f06_txedo import cufflinks
+from Modules.f03_samtools import sortBam
 #=============  define some parameters  ===================
 """these parameters and read group names are different for 
    different samples, should only change this part for 
@@ -45,7 +46,7 @@ Message(startMessage,email)
 #========  (1) read and trim files  ======================
 fastqFiles = list_files(file_path)
 if trim == 'True':
-    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)  # [[filename.fq.gz]]
+    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,batch=6)  # [[filename.fq.gz]]
 print 'list file succeed'
 print 'fastqFiles is: ',fastqFiles
 #========  (2) align to rRNA =============================
@@ -59,7 +60,7 @@ except:
     raise
 #========  (3) align to reference using tophat ===========
 try:
-    map_folders = tophat(noRNA_fqs,alignerDb,annotation,thread,['--no-novel-juncs']) # [filename.norna.tophat]
+    map_folders = tophat(noRNA_fqs,alignerDb,annotation,thread,['--no-novel-juncs','-g 1']) # [filename.norna.tophat]
     print 'tophat alignment succeed'
     print 'map_folders is: ',map_folders
 except:
@@ -71,17 +72,27 @@ try:
     bam4cufflinks = []
     for f in map_folders:
         bam = f + '/accepted_hits.bam'
-        better_bam = f[:-3] + 'bam'                         
-        bam4cufflinks.append(better_bam)                    # [filename.norna.topbam]
+        better_bam = f[:-3] + '.bam'                         
+        bam4cufflinks.append(better_bam)                    # [filename.norna.top.bam]
         cmd = ('samtools view -h {fst_map} | grep -E {pattern} | '
                'samtools view -bS - > {out}').format(fst_map=bam,
-                pattern='\'(NM:i:[01])|(^@)\'',out=better_bam)
+                pattern='\'(NM:i:[012])|(^@)\'',out=better_bam)
         subprocess.call(cmd,shell=True)
     print 'extract perfect match succeed'
+    print 'perfect matched bam is:',bam4cufflinks
 except:
     print 'extract perfect match failed'
     Message('extract perfect match failed',email)
     raise
+#========  (4) sort the bam file ==================
+try:
+    sortBams = sortBam(bam4cufflinks,thread,sortType='')
+    print 'sort bam succeed'
+    print 'sort bams is:',sortBams
+except:
+    print 'sort bam failed'
+    Message('sort bam failed',email)
+"""
 #========  (4) quantify the transcripts ==================
 try:
     result = cufflinks(bam4cufflinks,annotation,thread)  # [filename.nor_cufflinks]
@@ -89,6 +100,6 @@ try:
     print 'result is: ',result
 except:
     print 'cufflinks failed'
-    Message('extract perfect match failed',email)
-
+    Message('cufflinks failed',email)
+"""
 Message(endMessage,email)

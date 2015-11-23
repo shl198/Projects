@@ -239,10 +239,11 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
     """
     This function generates database for alignment using STAR
     """
+    if not os.path.exists(db_path): os.mkdir(db_path)
     if listdir(db_path) == []:
         cmd = ('STAR --runMode genomeGenerate --genomeDir {db_path} '
                '--genomeFastaFiles {ref_fa} --runThreadN {thread} '
-               '--limitGenomeGenerateRAM 69000000000 ').format(
+               '--limitGenomeGenerateRAM 100000000000 ').format(
                 db_path=db_path,ref_fa=ref_fa,thread=str(thread))
         if annotation != '':
             cmd = cmd + ('--sjdbGTFfile {gff3} --sjdbGTFtagExonParentTranscript Parent '
@@ -250,20 +251,26 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
     print cmd
     subprocess.check_call(cmd,shell=True)
     
-def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):
+def STAR(fastqFiles,db_path,thread=1,annotation='',otherParameters=['']):
     """
     STAR are more proper for aligning RNA seq
     otherParameters: a list of added parameters
     """
     map_results = []
     cmd = ''
+    if annotation != '':
+            otherParameters.extend(['--sjdbGTFfile {gff}'.format(gff=annotation), '--sjdbGTFtagExonParentTranscript Parent'])
     for fastq in fastqFiles:
         #------- define output sam file name ----
         if fastq[0].endswith(".fastq.gz"):
             output = fastq[0][:-8] 
         else:
             output = fastq[0][:-5]
-        map_results.append(output + 'Aligned.out.sam')
+        if '--outSAMtype BAM SortedByCoordinate' in otherParameters:
+            map_results.append(output + 'Aligned.sortedByCoord.out.bam')
+        else:
+            map_results.append(output + 'Aligned.out.sam')
+        
         #-------- map without annotation ---------
         if len(fastq) == 2:
             starCmd = ('STAR --genomeDir {ref} '
@@ -287,7 +294,7 @@ def STAR(fastqFiles,db_path,thread=1,otherParameters=['']):
     subprocess.check_call(cmd[:-3],shell=True)
     final_name = []
     for sam in map_results:
-        new_name = sam[:-15] + 'sam'
+        new_name = sam.split('.')[0] + '.' + sam[-3:]
         rename = ('mv {star_result} {modified_name}').format(star_result=sam,
                   modified_name=new_name)
         final_name.append(new_name)

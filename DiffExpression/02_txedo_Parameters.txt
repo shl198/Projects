@@ -72,3 +72,6 @@ gsnapAnnotation	name.splicesites.iit
 
 symbolIDFile	null
 	# if set, the file to convert gene symbol to gene id
+
+IDresource	ncbi
+	# id resource
