@@ -1,0 +1,80 @@
+# This file includes all parameters that need to be set for all pipelines.
+# For paired end fastq files, make sure the file name is in the format
+# name1.fq.gz, name2.fq.gz or name1.fastq.gz, name2.fastq.gz
+
+##===============  global parameters ================================
+thread	1
+	# number of threads
+
+
+email	shl198@eng.ucsd.edu
+	# the email which start and stop messages will be sent to
+ 	# can help to measure how long the scripts take
+
+
+startMessage	start
+	# message which will be sent to email when pipeline starts
+
+
+endMessage	end
+	# message which will be sent to email when pipeline finishes
+
+
+dataSource	ncbi
+	# reference and gff data source
+	# can also be ensembl
+
+
+refSequence	/path/to/ref/fasta/file
+	# fasta file of target organism
+
+
+filePath	/path/to/fastq/files/folder
+	# folder where fastq files locate
+
+
+alignerDb	/path/to/aligner/database
+	# index of refSequence for aligner to be used
+
+
+trim	False
+	# choose whether to trim the origional fastq files
+
+
+phred	33
+	# encoding score for raw data.
+	# other option: 64
+	# If RNAseq encode version is less than 1.8, it is recommend to trim the data.
+
+
+trimmomatic	/home/shangzhong/Installation/Trimmomatic-0.32/trimmomatic-0.32.jar
+	# trimmomatic pathway
+
+
+trimmoAdapter	
+	# trimmomatic adapter files
+
+
+aligner	/aligner/to/use
+	# set aligner to run the pipeline, gsnap and start recomended
+
+
+annotation	/path/to/annotation/gff3/file
+	# annotation file for organism
+
+
+htseqOutPath	/path/to/store/htseqCount/file
+	# pathway in which the htseq count files stores
+
+
+gsnapDbName	/db/name/for/gsnap
+	# If you use gsnap, you need to set this parameter
+
+
+gsnapAnnotation	/gsnap/annotation/file
+	# annotaton file for gsnap
+
+
+symbolIDFile	/path/to/files/stores/genesymbol/geneid/mapping
+	# This is mainly applied when data source is from ncbi and you want entez gene id. If set, the file should has two columns, first is gene symbol, second is gene entrez id.
+
