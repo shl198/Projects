@@ -282,36 +282,6 @@ def chunks(l, n):
     n = max(1, n)
     return [l[i:i + n] for i in range(0, len(l), n)]
 
-
-###===================== position 5'end coverage  ===============================
-def pos5Coverage(bams,batch=1):
-    """
-    This function calculates coverage of 5' reads at each position
-    
-    * bams: list. A list of bam files. Alternative: sam
-    return a list of files that have 3 columns: ['count','Chr','pos']
-    """
-    cmd = ''
-    res = []
-    sub_bams = chunks(bams,batch)
-    for bams in sub_bams:
-        for bam in bams:
-            outFile = bam[:-3] +'5endCov.txt'
-            res.append(outFile)
-            if bam[-3:] == 'bam':
-                cmd = cmd + ('samtools view {bam} | cut -f 3,4 | uniq -c > {outFile} & ').format(
-                                bam=bam,outFile=outFile)
-            else:
-                cmd = cmd + ('cut -f 3,4 {sam} | uniq -c > {outFile} & ').format(
-                                sam=bam,outFile=outFile)
-        subprocess.call(cmd + 'wait',shell=True)
-    return res
-# filepath = '/data/shangzhong/RibosomeProfiling/Ribo_align/23'
-# os.chdir(filepath)
-# bamFiles = [f for f in os.listdir(filepath) if f.endswith('sam')]
-# bamFiles = natsorted(bamFiles)
-# pos5Coverage(bamFiles,6)
-
 #===============================================================================
 #             gene length statistics
 #===============================================================================
@@ -534,53 +504,10 @@ def mRNApercent5endCov(exon_cov_df,exon_df,geneIDs):
         print gene,'analysis done'
     res_df = res_df.transpose()
     return res_df
+
 #===============================================================================
 #             coverage calculation at each position
 #===============================================================================
-def RNAcovAllPos(exonCovFile,cdsBedFile,geneIDs,chr_len_file):
-    """
-    This function calculates how many reads map to each position of genes, with
-    up number of nts and down number of nts.
-    
-    * exon_cov_df: df. Dataframe read by pandas, with 3 columns:['coverage','Chr','pos']
-    * cdsBedFile: str. Filename, with 6 columns: ['Chr','cds_start','cds_end','GeneID','None','Strand']
-    * geneIDs: list. A list of gene IDs you want to include.
-    * chr_len_file: dict. Stores chromosome length information.
-    """
-    # 1) read choromosome length
-    df = pd.read_csv(chr_len_file,sep='\t',header=0)
-    chr_len_dict = df.set_index('Chr')['Length'].to_dict()
-    # 2) read coverage file
-    exon_cov_df = pd.read_csv(exonCovFile,header=None,names=['coverage','Chr','pos'],delim_whitespace=True)
-    cds_df = pd.read_csv(cdsBedFile,sep='\t',header=None,names=['Chr','cds_start','cds_end','GeneID','None','Strand'])
-    #3) loop for each gene
-    output = exonCovFile[:-11]+'geneRawCount.txt'
-    outHandle = open(output,'w')
-    outHandle.write('\t'.join(['GeneID','rawCount','length'])+'\n')
-    for gene in geneIDs:
-        # 1). get the chromosome for gene
-        gene_cds_df = cds_df[cds_df['GeneID'].values==gene]
-        if gene_cds_df.empty:
-            outHandle.write(gene + '\t' + '0'+'\n')
-            continue
-        chrome = list(set(gene_cds_df['Chr'].tolist()))
-        if len(chrome) > 1:
-            print gene,'maps to many chromosome'
-            continue
-        # 2) get the coverage for the specific chromosome
-        gene_cov_df = exon_cov_df[exon_cov_df['Chr'].values==chrome[0]]  # columns= [count,chr,pos]
-        # 3) list all CDS position for the gene and upstream downstream bases.
-        gene_obj = trpr(gene_cds_df)
-        pos = gene_obj.get_trpr_pos(gene,level='gene')
-        # 4) get coverage for all positions including upstream and downstream locations.
-        chr_len = chr_len_dict[chrome[0]]
-        cov_target = getCDSCov(gene_cov_df,pos,chr_len)
-        count = str(sum(map(int,cov_target)))
-        length = str(len(cov_target))
-        outHandle.write('\t'.join([gene,count,length])+'\n')
-    outHandle.close()
-    return output
-
 def normGeneCov(line,up,down,by='mean'):
     """
     This function normalize gene coverage by divie count at each position by total count and mean.
@@ -616,6 +543,7 @@ def normGeneCov(line,up,down,by='mean'):
         median = (df.loc[-15+45:endIndex-down-14-30]).median().values[0]
         df = df/float(median)
     return df
+
 
 def normGeneCovWindow(geneCovFile,gene_sp,total,up,down,center):
     """
@@ -838,6 +766,8 @@ def mergeGeneExpress(outFile,coverFiles,chrPosCovFiles,covType='rawCount'):
             gene_count_df = gene_count_df.div(length,axis=0)*(1000)
     gene_count_df.insert(0,'GeneID',count_df['GeneID'])
     gene_count_df.to_csv(outFile,sep='\t',index=False)
+    
+    
 #===============================================================================
 #             motif stalling sites
 #===============================================================================
@@ -985,9 +915,10 @@ class trpr(object):
             new_pos = range(pos[0]-off,pos[0]) + pos[:-off]
         return new_pos
     
-    def htseq_genome_array_set(self,stranded=True):
+    def htseq_genome_array_set(self,stranded=False):
         """
         This function generates a genomic array of set for finding the position that are ovelapped by genes
+        * stranded: logical. 
         """
         gene_array_set = ht.GenomicArrayOfSets('auto',stranded=stranded)
         for row in self.df.itertuples(index=False):
@@ -1000,7 +931,7 @@ class trpr(object):
         
     def genes_cov_target_pos(self,chrom,pos):
         """
-        This function return the genes that cover the position.
+        This function returns the genes that cover the position.
         * chrom: str. chromosome.
         * pos: int. position. 
         return list of genes containing that position
@@ -1042,6 +973,26 @@ class trpr(object):
         
         return chr_pr_start_end_sites
     
+    def get_exn_cds_start_end_pos(self,gene):
+        """
+        This function gets the start and end position of exons or cds of a gene provided
+        returns 2 list of start position and end position
+        """
+        gene_df = self.df[self.df['geneid'].values==gene]
+        strand = list(set(gene_df['strand'].tolist()))[0]
+        if strand == '+':
+            exn_start = gene_df['start'].tolist()
+            exn_end = gene_df['end'].tolist()
+#             ex_start = [abs(n-exn_start[0]) for n in exn_start]
+#             ex_end = [abs(n-exn_start[0]) for n in exn_end]
+        else:
+            exn_start = gene_df['end'].tolist()
+            exn_end = gene_df['start'].tolist()
+            exn_start.reverse()
+            exn_end.reverse()
+#             ex_start = [abs(n-exn_end[-1]) for n in exn_start]
+#             ex_end = [abs(n-exn_end[-1]) for n in exn_end]
+        return exn_start,exn_end
     
 def write_dic(dic,File):
     """
@@ -1056,7 +1007,7 @@ def write_dic(dic,File):
 
 def fwd_rev_cov(bamFile,max_len=37,seq_len=50):
     """
-    This function calculate mapping position of each read and count the number for those with the same positions
+    This function calculates mapping 5' and 3' end position of each read and count the number for those with the same positions
     * bamFile: str. Bam file
     output a file with cover dataframe. The columns are: ['num','chr','end5','end3','strand','len']    
     """
@@ -1134,12 +1085,10 @@ def posCoverage(gene_df,cov_df,pos,gene_array_set):
     """
     This function calculates the coverage at each position of gene
     
-    * gene_df: pd dataframe. with 6 columns # 'chr','start','end','geneid','praccess','strand'
+    * gene_df: pd dataframe. with 6 columns # 'chr','start','end','geneid','praccess','strand'. Here it is used to get chromosoem.
     * cov_df: pd dataframe. with 6 columns # 'num','chr','end5','end3','strand','len'. end5 and end 3 are alignment end, not read end.
-    * gene: gene name.
     * pos: list. List of position.
     * gene_array_set: htseq genearray set. Used for removing reads mapping to multiple genes.
-    * strand_specific: str. consider the strand information or not.
     """
     gene = list(set(gene_df['geneid'].tolist()))
     g_obj = trpr(gene_df) 
@@ -1167,7 +1116,7 @@ def posCoverage(gene_df,cov_df,pos,gene_array_set):
     return cov_pos      
         
             
-def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos'):
+def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[]):
     """
     This function gets all protein position coverage in a coverfile, longest protein for a gene is chosen
     
@@ -1175,6 +1124,7 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos'):
     * cdsFile: str. Filename with 6 columns.
     * ribo_offset_file: str. Filename with 2 columns: length,offset
     * covType: str. get coverage at position level or at the gene level.
+    * genes: list. If setted it will only get coverage for the genes provided, if not it will calculate all genes.
     If covType is pos: each line of output would be "geneid    protein access    coverage at each position"
     If covType is gene: each line of output would be "geneid    total count    length of total CDS positions"
     """
@@ -1190,7 +1140,8 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos'):
     ribo_offset_df = pd.read_csv(ribo_offset_file,sep='\t',header=0,names=['len','off'],low_memory=False)
     off_len_dic = {k:list(v) for k,v in ribo_offset_df.groupby('off')['len']}
     # 5) get all genes
-    genes = trpr_obj.all_gene_ids()
+    if genes==[]:
+        genes = trpr_obj.all_gene_ids()
     genes = natsorted(genes)
     # 6) get coverage for each gene
     if covType == 'pos':
@@ -1233,7 +1184,7 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos'):
                         new_pos = range(pos[0]+off,pos[0],-1) + pos[:-off]
                     else:
                         new_pos = range(pos[0]-off,pos[0]) + pos[:-off]                    
-                    cov_pos = posCoverage(gene_df,off_cov_df,pos,gene_array_set)
+                    cov_pos = posCoverage(gene_df,off_cov_df,new_pos,gene_array_set)
                     gene_cov_df[str(off)] = pd.Series(cov_pos)
             except:
                 print g,'maps to multiple scaffold'
@@ -1243,7 +1194,14 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos'):
     handle.close()        
             
 
-def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath):
+def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath,genes=[]):
+    """This function get coverage at position level for RNAseq. gene transcript coverage
+    
+    * exnFile: str. Filename has 6 columns. ['Chr','Start','End,'GeneID','TrAccess','Strand']
+    * cdsFile: str. Filename has 6 columns. ['Chr','Start','End,'GeneID','PrAccess','Strand']
+    * add_id_file: str. Filename has all kinds ids
+    * covFile: str. Filename 
+    """
     #------------- build protein:transcript dictionary -----------------------------
     df = pd.read_csv(all_id_file,sep='\t',header=0,names=['id','symbol','chr','tr','pr'])
     dic_df = df[['tr','pr']].drop_duplicates()
@@ -1260,8 +1218,9 @@ def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath):
     cds_obj = trpr(cds_df)
     # 4). create array set by htseq. This is for retriving positions that are covered by many genes
     gene_array_set = exn_obj.htseq_genome_array_set(False)
-    # 5) get all genes
-    genes = cds_obj.all_gene_ids()
+    # 5) get all protein coding genes 
+    if genes == []:  # consider all genes
+        genes = cds_obj.all_gene_ids()
     genes = natsorted(genes)
     # 6) get coverage for each gene
     handle = open(outpath+'/'+covFile.split('.')[0]+'_trpos.txt','w')
@@ -1282,6 +1241,84 @@ def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath):
         handle.write(g+'\t'+tr+'\t'+long_pr+'\t'+'\t'.join(cov_pos)+'\n')
     handle.close()        
 
+
+def merge_rep_gene_pos_cov(totalCount,covFiles,gene,exn_df,covType='trpt'):
+    """
+    This function calculates the ribo seq coverage at each position and . and then merge the replicates.
+    * totalCount: list. A list of total count for replicated bam files.
+    * covFiles: list. A list of filenames with 6 columns. # 'num','chr','end5','end3','strand','len'
+    * gene: str. Target gene
+    * exn_df: dataframe. File name of 6 columns.
+    * covType: str. 'gene' or 'trpt'.
+    """
+    gene_cov_df = pd.DataFrame()
+    for f in covFiles:
+        cov_df = pd.read_csv(f,sep='\t',header=None,names=['num','chr','end5','end3','strand','len'])
+        gene_df = exn_df[exn_df['GeneID'].values==gene]
+        gene_obj = trpr(gene_df)
+        trpr_id = list(set(gene_df['access'].tolist()))[0]
+        pos = gene_obj.get_trpr_pos(trpr_id)
+        if covType == 'gene':
+            tr_last = pos[-1]
+            if pos[0]>pos[1]:  # - strand
+                pos = range(pos[0],pos[-1]-1,-1)
+            else:
+                pos = range(pos[0],pos[-1]+1)
+        gene_array_set = gene_obj.htseq_genome_array_set(False)
+        cov_pos = posCoverage(gene_df,cov_df,pos,gene_array_set)
+        gene_cov_df[f] = pd.Series(cov_pos)
+    print 'position of start of 3 UTR relative to gene:',pos.index(tr_last)
+    gene_cov_df = gene_cov_df.div(totalCount) * (10**6)
+    gene_cov_df['mean'] = gene_cov_df.mean(axis=1)
+    return gene_cov_df['mean']
+
+
+def utr3_cov(exnFile,cdsFile,all_id_file,covFile,outpath,genes=[]):
+    """This function calculates the coverage at the 3'UTR region
+    """
+    if not os.path.exists(outpath): os.mkdir(outpath)
+    #------------- 1. build protein:transcript dictionary -----------------------------
+    df = pd.read_csv(all_id_file,sep='\t',header=0,names=['id','symbol','chr','tr','pr'])
+    dic_df = df[['tr','pr']].drop_duplicates()
+    pr_tr_dic = dic_df.set_index('pr')['tr'].to_dict()
+    # 1) read coverage files
+    cov_df = pd.read_csv(covFile,sep='\t',header=None,names=['num','chr','end5','end3','strand','len'],low_memory=False)
+    # 2) read transcript position file
+    exn_df = pd.read_csv(exnFile,sep='\t',header=0,low_memory=False)   # Chr    cds_start    cds_end    GeneID    Pr_Access    Strand
+    exn_obj = trpr(exn_df)
+    # 3) read cds position file
+    cds_df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)
+    cds_obj = trpr(cds_df)
+    # 4). create array set by htseq. This is for retriving positions that are covered by many genes
+    gene_array_set = exn_obj.htseq_genome_array_set(False)
+    # 5) get all protein coding genes 
+    if genes == []:  # consider all genes
+        genes = cds_obj.all_gene_ids()
+    genes = natsorted(genes)
+    # 6) get coverage for each gene
+    handle = open(outpath+'/'+covFile.split('.')[0]+'_3utr.txt','w')
+    for g in genes:
+        try:
+            gene_cds_df = cds_df[cds_df['geneid'].values==g]
+            gene_exn_df = exn_df[exn_df['geneid'].values==g]
+            g_cds_obj = trpr(gene_cds_df)
+            g_exn_obj = trpr(gene_exn_df)
+            long_pr = g_cds_obj.get_longest_trpr(g)  # longest protein of the gene
+            tr = pr_tr_dic[long_pr]  # correspond transcript
+            cds_pos = g_cds_obj.get_trpr_pos(long_pr)  # position of cds
+            rna_pos = g_exn_obj.get_trpr_pos(tr) # position of the rna
+            index = rna_pos.index(cds_pos[-1])
+            pos = rna_pos[index+1:]  # utr position
+            if pos == []:
+                print g,'has no 3utr'
+                continue
+            cov_pos = posCoverage(gene_exn_df,cov_df,pos,gene_array_set)
+            cov_pos = [str(p) for p in cov_pos]
+        except:
+            print g,'maps to multiple scaffold'
+            continue
+        handle.write(g+'\t'+tr+'\t'+long_pr+'\t'+'\t'.join(cov_pos)+'\n')
+    handle.close()
 
 
 def refseq_reffa_inconsist_pr(cdsFile,refFaFile,prFaFile,pr_id_file,pr_seq_file):

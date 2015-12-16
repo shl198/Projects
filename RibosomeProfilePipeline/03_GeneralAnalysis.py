@@ -23,18 +23,24 @@ pr_cov_path = bam_path + '/03_pr_pos_cov'    # store results from part 1.
 gene_count_path = bam_path + '/04_gene_total_count' 
 stall_path = bam_path + '/05_stall_sites'
 codon_AA_freq_path = bam_path + '/06_codon_AA_freq'
+utr3_cov_path = bam_path + '/07_utr3_cov'
 
-
+all_id_file = db_path + '/combined_AllIDS.txt'  # part 8
+cdsFile = db_path + '/01_pr_cds.txt' # part 8
+exnFile = db_path + '/01_pr_rna.txt' # part 8
+# rna
 rna_bam_path = '/data/shangzhong/RibosomeProfiling/TotalRNA_align'
 rna_count_path = rna_bam_path + '/01_gene_count'
+
+
 #===============================================================================
 #                     1. get position coverage for each A site for all protiens. Results stored in folder 03_pr_pos_cov
 #===============================================================================
-os.chdir(fwd_rev_path)
-covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
-covFiles = natsorted(covFiles)
-cdsFile = db_path + '/01_pr_cds.txt'
-gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,pr_cov_path+'/old')
+# os.chdir(fwd_rev_path)
+# covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
+# covFiles = natsorted(covFiles)
+# cdsFile = db_path + '/01_pr_cds.txt'
+# #gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,pr_cov_path+'/old')
 # proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,pr_cov_path,)) for covFile in covFiles]
 # for p in proc:
 #     p.start()
@@ -48,7 +54,7 @@ gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,pr_cov_path+'/old')
 # covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
 # covFiles = natsorted(covFiles)
 # cdsFile = db_path + '/01_pr_cds.txt'
-# #gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,gene_count_path,'gene')
+# #gene_pr_cov(covFiles[0],cdsFile,ribo_offset_file,gene_count_path,'gene',['heavychain'])
 # proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,gene_count_path,'gene',)) for covFile in covFiles]
 # for p in proc:
 #     p.start()
@@ -126,7 +132,7 @@ gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,pr_cov_path+'/old')
 #                        6. plot AA and codon frequencys (figures in folder figures)
 #===============================================================================
 #=================== change nt to AA and calculate the t-test===============
-
+"""
 # 1. get the significant AA and codons
 path = codon_AA_freq_path
 os.chdir(path)
@@ -246,7 +252,7 @@ ax.set_xlabel('Amino Acids',color='black',fontsize=16)
 plt.savefig(fig_path + '/04_AA_freq.png')
 plt.savefig(fig_path + '/04_AA_freq.svg')
 #plt.show()
-
+"""
 #===============================================================================
 #                         7. plot translation and transcription change for each gene
 #===============================================================================
@@ -281,9 +287,9 @@ plt.savefig(fig_path + '/04_AA_freq.svg')
 # os.chdir(rna_count_path)
 # rna_count_files = [f for f in os.listdir(rna_count_path) if f.endswith('Count.txt')]
 # rna_count_files = natsorted(rna_count_files)
-# 
+#  
 # rna_rpkm = pd.DataFrame()
-# 
+#  
 # for f,total in zip(rna_count_files,totalCount):
 #     df = pd.read_csv(f,sep='\t',header=0,names=['GeneID','count','length'])
 #     df[f] = df['count']/df['length']/float(total)*(10**9)  # calculate rpkm
@@ -304,16 +310,16 @@ plt.savefig(fig_path + '/04_AA_freq.svg')
 # ribo_rna_df['mrna_change'] = (ribo_rna_df['rna_day6']/ribo_rna_df['rna_day3']).apply(np.log2)
 # #---------- plot -------------
 # plt.plot(ribo_rna_df['mrna_change'],ribo_rna_df['ribo_change'],'.',color='#6699CC')
-# 
+#  
 # heavy_df = ribo_rna_df[ribo_rna_df.index.isin(['heavychain'])]
 # plt.plot(heavy_df['mrna_change'],heavy_df['ribo_change'],'.',color='red',alpha=1)
-#  
+#   
 # light_df = ribo_rna_df[ribo_rna_df.index.isin(['lightchain'])]
 # plt.plot(light_df['mrna_change'],light_df['ribo_change'],'.',color='yellow',alpha=1)
-#  
+#   
 # neo_df = ribo_rna_df[ribo_rna_df.index.isin(['NeoRKanR'])]
 # plt.plot(neo_df['mrna_change'],neo_df['ribo_change'],'.',color='black',alpha=1)
-#  
+#   
 # plt.xlabel('log2 mRNA change')
 # plt.ylabel('log2 rpf change')
 # plt.title('Translation change Day6 VS Day3')
@@ -321,5 +327,17 @@ plt.savefig(fig_path + '/04_AA_freq.svg')
 # plt.axvline(x=0,color='k')
 # plt.savefig(fig_path + '/05_translation_efficiency.png')
 # plt.savefig(fig_path + '/05_translation_efficiency.svg')
-
+#===============================================================================
+#                         8. 3'UTR of all genes
+#===============================================================================
+# #----------------- 1. read coverage file ------------------------------
+# os.chdir(fwd_rev_path)
+# covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
+# covFiles = natsorted(covFiles)
+# #utr3_cov(exnFile,cdsFile,all_id_file,covFiles[0],utr3_cov_path,genes=[])
+# proc = [Process(target=utr3_cov,args=(exnFile,cdsFile,all_id_file,f,utr3_cov_path,)) for f in covFiles]
+# for p in proc:
+#     p.start()
+# for p in proc:
+#     p.join()
 
