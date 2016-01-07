@@ -15,7 +15,7 @@ from Modules.f04_htseq import htseq_count
 from Modules.f05_IDConvert import geneSymbol2EntrezID
 from Modules.p01_FileProcess import get_parameters
 #=========== define some parameters ===================
-#parFile = '/data/shangzhong/DE/GlycoKnock/01_DE_Parameters.txt'
+#parFile = '/data/shangzhong/DE/FDA/Database/01_DE_Parameters.txt'
 parFile = sys.argv[1]
 param = get_parameters(parFile)
 
