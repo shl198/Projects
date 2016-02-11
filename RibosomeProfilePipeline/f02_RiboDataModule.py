@@ -13,6 +13,11 @@ import pysam
 import HTSeq as ht
 from Modules.p03_ParseSam import bam_parse
 
+def chunk(l,n):
+    n = max(1,n)
+    res = [l[i:i+n] for i in range(0,len(l),n)]
+    return res
+
 def signalP(inputFa):
     """
     This function runs signalp for files
@@ -928,7 +933,7 @@ class trpr(object):
                 print row,'has problem'
                 continue
         return gene_array_set
-        
+       
     def genes_cov_target_pos(self,chrom,pos):
         """
         This function returns the genes that cover the position.
@@ -1114,9 +1119,9 @@ def posCoverage(gene_df,cov_df,pos,gene_array_set):
     cov_obj = cover(fil_cov_df)            
     cov_pos = cov_obj.get_pos_coverage(chrom, pos)
     return cov_pos      
-        
-            
-def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[]):
+
+
+def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[],pr_cov_level='codon'):
     """
     This function gets all protein position coverage in a coverfile, longest protein for a gene is chosen
     
@@ -1156,6 +1161,10 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[])
                 for offset in natsorted(off_len_dic):  # alignment length
                     off_cov_df = cov_df[cov_df['len'].isin(off_len_dic[offset])]
                     off = offset + 1
+                    # if gene is NeoR, offset change to 16 for all alignment length
+                    if g == 'NeoRKanR':
+                        off = 17
+                    # end
                     if pos[0]>pos[1]: # - strand
                         new_pos = range(pos[0]+off,pos[0],-1) + pos[:-off]
                     else:
@@ -1166,7 +1175,11 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[])
                 print g,'maps to multiple scaffold'
                 continue
             gene_cov = gene_cov_df.sum(axis=1).tolist()
-            pr_cov = [str(sum(p)) for p in chunks(gene_cov,3)]
+            
+            if pr_cov_level == 'codon':
+                pr_cov = [str(sum(p)) for p in chunks(gene_cov,3)]
+            elif pr_cov_level == 'nt':
+                pr_cov = [str(p) for p in gene_cov]
             handle.write(g+'\t'+long_pr+'\t'+'\t'.join(pr_cov)+'\n')
     else:  # covType == 'gene'
         handle = open(outpath+'/'+covFile.split('.')[0]+'_geneCount.txt','w')
@@ -1191,16 +1204,20 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[])
                 continue
             gene_cov = gene_cov_df.sum(axis=1).tolist()
             handle.write('\t'.join([g,str(sum(gene_cov)),str(len(gene_cov))])+'\n')
-    handle.close()        
+    handle.close()
             
 
-def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath,genes=[]):
-    """This function get coverage at position level for RNAseq. gene transcript coverage
+def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath,genes=[],offset='no',ribo_offset_file=''):
+    """This function get coverage at position level for RNAseq. gene transcript coverage. The transcript with longest CDS length is chosen.
     
     * exnFile: str. Filename has 6 columns. ['Chr','Start','End,'GeneID','TrAccess','Strand']
     * cdsFile: str. Filename has 6 columns. ['Chr','Start','End,'GeneID','PrAccess','Strand']
-    * add_id_file: str. Filename has all kinds ids
-    * covFile: str. Filename 
+    * all_id_file: str. Filename has all kinds ids
+    * covFile: str. Filename
+    * outpath: str. Path that store the results. Each line in each file, first column is gene id, second is tr id, third is pr id, the rest is coverage at each position of transcript.
+    * genes: list. A list of genes.
+    * offset: 'yes' or 'no'. For RNAseq should be no. 'yes' is for getting riboseq coverage at transcript level
+    * ribo_offset_file: str. File that stores the offset for each alignment length.
     """
     #------------- build protein:transcript dictionary -----------------------------
     df = pd.read_csv(all_id_file,sep='\t',header=0,names=['id','symbol','chr','tr','pr'])
@@ -1224,21 +1241,56 @@ def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath,genes=[]):
     genes = natsorted(genes)
     # 6) get coverage for each gene
     handle = open(outpath+'/'+covFile.split('.')[0]+'_trpos.txt','w')
-    for g in genes:
-        try:
-            gene_cds_df = cds_df[cds_df['geneid'].values==g]
-            gene_exn_df = exn_df[exn_df['geneid'].values==g]
-            g_cds_obj = trpr(gene_cds_df)
-            g_exn_obj = trpr(gene_exn_df)
-            long_pr = g_cds_obj.get_longest_trpr(g)  # longest protein of the gene
-            tr = pr_tr_dic[long_pr]  # correspond transcript
-            pos = g_exn_obj.get_trpr_pos(tr) # position of the protein
-            cov_pos = posCoverage(gene_exn_df,cov_df,pos,gene_array_set)
-            cov_pos = [str(p) for p in cov_pos]
-        except:
-            print g,'maps to multiple scaffold'
-            continue
-        handle.write(g+'\t'+tr+'\t'+long_pr+'\t'+'\t'.join(cov_pos)+'\n')
+    if offset == 'no':
+        for g in genes:
+            try:
+                gene_cds_df = cds_df[cds_df['geneid'].values==g]
+                gene_exn_df = exn_df[exn_df['geneid'].values==g]
+                g_cds_obj = trpr(gene_cds_df)
+                g_exn_obj = trpr(gene_exn_df)
+                long_pr = g_cds_obj.get_longest_trpr(g)  # longest protein of the gene
+                tr = pr_tr_dic[long_pr]  # correspond transcript
+                pos = g_exn_obj.get_trpr_pos(tr) # position of the protein
+                cov_pos = posCoverage(gene_exn_df,cov_df,pos,gene_array_set)
+                cov_pos = [str(p) for p in cov_pos]
+            except:
+                print g,'maps to multiple scaffold'
+                continue
+            handle.write(g+'\t'+tr+'\t'+long_pr+'\t'+'\t'.join(cov_pos)+'\n')
+    else:  # consider the offset for riboseq coverage at transcript level
+        # 1) get the offset length
+        ribo_offset_df = pd.read_csv(ribo_offset_file,sep='\t',header=0,names=['len','off'],low_memory=False)
+        off_len_dic = {k:list(v) for k,v in ribo_offset_df.groupby('off')['len']}
+        # 2) get coverage for each gene
+        for g in genes:
+            gene_cov_df = pd.DataFrame()
+            try:
+                gene_cds_df = cds_df[cds_df['geneid'].values==g]
+                gene_exn_df = exn_df[exn_df['geneid'].values==g]
+                g_cds_obj = trpr(gene_cds_df)
+                g_exn_obj = trpr(gene_exn_df)
+                long_pr = g_cds_obj.get_longest_trpr(g)  # longest protein of the gene
+                tr = pr_tr_dic[long_pr]  # correspond transcript
+                pos = g_exn_obj.get_trpr_pos(tr) # position of the protein
+                for offset in natsorted(off_len_dic):  # alignment length
+                    off_cov_df = cov_df[cov_df['len'].isin(off_len_dic[offset])]
+                    off = offset + 1
+                    # if gene is NeoR, offset change to 16 for all alignment length
+                    if g == 'NeoRKanR':
+                        off = 17
+                    # end
+                    if pos[0]>pos[1]: # - strand
+                        new_pos = range(pos[0]+off,pos[0],-1) + pos[:-off]
+                    else:
+                        new_pos = range(pos[0]-off,pos[0]) + pos[:-off]
+                    cov_pos = posCoverage(gene_exn_df,off_cov_df,new_pos,gene_array_set)
+                    gene_cov_df[str(offset)] = pd.Series(cov_pos)
+            except:
+                print g,'maps to multiple scaffold'
+                continue
+            gene_cov = gene_cov_df.sum(axis=1).tolist()  # sum all alignment lengths
+            pr_cov = [str(p) for p in gene_cov]
+            handle.write(g+'\t'+tr+'\t'+long_pr+'\t'+'\t'.join(pr_cov)+'\n')
     handle.close()        
 
 
@@ -1373,3 +1425,84 @@ def refseq_reffa_inconsist_pr(cdsFile,refFaFile,prFaFile,pr_id_file,pr_seq_file)
             print pr,'not in the annotation file'
     handle.close()
     handle1.close()
+
+#===============================================================================
+#             frame count
+#===============================================================================
+def frame_count(cov,calType='sum'):
+    """This function calculcate and compare the frame coverage.
+    * cov: list. A list of coverage at each position.
+    * calType: str. If set as sum, the frame coverage would be the summation.
+                    If set as median, the frame coverage would be the median of all in the same frame.
+                    If set as scale, the framme coverage would be scale inside each codon, largest value is 1, the other is the fraction.
+    """
+    if len(cov)%3 != 0:
+        print 'sequence length is not times of 3'
+    frames = [0] * 3
+    if calType == 'median':
+        full_list = [[] for i in range(3)]
+        for i in range(len(cov)):
+            if i%3 == 0:
+                full_list[2].append(int(cov[i]))
+            elif i%3 == 1:
+                full_list[0].append(int(cov[i]))
+            else:
+                full_list[1].append(int(cov[i]))
+        for i in range(3):
+            frames[i] = np.median(full_list[i])
+    elif calType == 'sum':
+        for i in range(len(cov)):
+            if i%3 == 0:
+                frames[2] += int(cov[i])
+            elif i%3 == 1:
+                frames[0] += int(cov[i])
+            else:
+                frames[1] += int(cov[i])
+        sum_cov = sum(frames)
+        frames = [float(p)/max(1,sum_cov) for p in frames]
+    elif calType == 'scale':
+        cov_list = chunk(cov,3)
+        for codon in cov_list:
+            if len(codon) != 3:
+                continue
+            max_cov = max(codon)
+            if max_cov == 0:
+                continue
+            for i in range(len(codon)):
+                try:
+                    codon[i] = codon[i]/max_cov
+                except:
+                    raise False, 'divide by 0'
+#             codon = [c/float(codon[1]) for c in codon]
+            frames[1] += float(codon[2])
+            frames[2] += float(codon[0])
+            frames[0] += float(codon[1])
+    return frames
+
+
+def genes_frame_cov(pr_pos_cov_file,out_path,genes=[],calType='sum'):
+    """This function calculates frame coverage for all the genes that are listed.
+    * pr_pos_cov_file: filename of coverage file.
+    * out_path: str. Pathway of the results.
+    * genes: list. A list of genes.
+    * calType: str. can be 'sum','median','scale'.
+    """
+    if not os.path.exists(out_path): os.mkdir(out_path)
+    handle = open(pr_pos_cov_file)
+    outFile = out_path + '/' + pr_pos_cov_file[:-3]+'frame.txt'
+    out_handle = open(outFile,'w')
+    out_handle.write('\t'.join(['geneid','frame1','frame2','frame3\n']))
+    for line in handle:
+        item = line[:-1].split('\t')
+        geneid = item[0]
+        if (genes!=[]) and (geneid not in genes): continue
+        cov = item[2:]  # coverage
+        cov = [int(p) for p in cov]
+        if sum(cov) < 128:
+            continue
+        frames = frame_count(cov,calType)
+        frames = [str(p) for p in frames]
+        out_handle.write(geneid + '\t' + '\t'.join(frames)+'\n')
+    handle.close()
+    out_handle.close()
+        

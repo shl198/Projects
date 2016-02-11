@@ -15,9 +15,10 @@ from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
 from multiprocessing import Process
 from Modules.p05_ParseGff import extractAllPr
-from matplotlib import gridspec
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 mpl.style.use('ggplot')
-import pdb
+import matplotlib.gridspec as gridspec
 
 bam_path = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam'
 db_path = '/data/shangzhong/RibosomeProfiling/Database'
@@ -29,6 +30,8 @@ fwd_rev_path = bam_path + '/01_cov'   # mapping file. part 8
 gene_count_path = bam_path + '/04_gene_total_count'  # part 8
 rna_gene_count_path = rna_bam_path + '/01_gene_count'
 rna_cov_path = rna_bam_path + '/02_cov'
+stall_site_path = bam_path + '/05_stall_sites'
+frame_cov_path = bam_path + '/09_frame_cov'
 
 exnFile = db_path +'/01_pr_rna.txt'  # part 8,
 cdsFile = db_path + '/01_pr_cds.txt' # part 8,
@@ -36,6 +39,12 @@ ribo_offset_file = bam_path + '/02_TSS_TSE_cov/ribo_offset.txt'      # part 8,
 refFaFile = db_path + '/combined.fa'
 gffFile = db_path + '/combined.gff'
 mapFile = db_path + '/combined_AllIDS.txt'
+all_id_file = db_path + '/combined_AllIDS.txt'
+
+def chunk(l,n):
+    n = max(n,1)
+    result = [l[i:i+n] for i in range(0,len(l),n)]
+    return result
 #===============================================================================
 #                         0. prepare protein files for signalP, add antibody proteins.
 #===============================================================================
@@ -336,7 +345,7 @@ plt.show()
 """
 #===============================================================================
 #                         10. find out one endogenous gene coverage (this part cannot be automated because there are some parameters
-#                             in part 2 that I need to modify for each different gene)
+#                             in part 2 that I need to modify for each different gene) (for Eef1a1, heavychain,lightchain,NeoRKanR)
 #===============================================================================
 #============================ ribo seq plot ===============================
 def plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,ylim1,ylim2,hp,dy0_times,dy1_times,outFile,shift=0,more_shift=0):
@@ -365,8 +374,8 @@ def plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,ylim1
     print 'cds end is:', cds_end
     #-------------- 3) get coverage -----------------------
     gene_df = pd.DataFrame()
-    gene_df['day3'] = merge_rep_gene_pos_cov(totalCount[0:3],covFiles[0:3],gene,exn_df,covType)
-    #gene_df['day6'] = merge_rep_gene_pos_cov(totalCount[3:6],covFiles[3:6],gene,exn_df,covType)
+    #gene_df['day3'] = merge_rep_gene_pos_cov(totalCount[0:3],covFiles[0:3],gene,exn_df,covType)
+    gene_df['day6'] = merge_rep_gene_pos_cov(totalCount[3:6],covFiles[3:6],gene,exn_df,covType)
     #-------------- 4) plot day3 and day6 ------------------
     plt_df = gene_df.copy()
     if shift != 0 or more_shift != 0:
@@ -384,8 +393,8 @@ def plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,ylim1
     gs = gridspec.GridSpec(2,1,height_ratios=[1,3])
     ax0 = f.add_subplot(gs[0]);ax1 = f.add_subplot(gs[1]);#ax3 = f.add_subplot(gs[2]);ax4 = f.add_subplot(gs[3])
     f.set_size_inches(14.5,8)
-    ax0.bar(plt_df.index,plt_df['day3'],align='center',color='black',edgecolor='black')
-    ax1.bar(plt_df.index,plt_df['day3'],align='center',color='black',edgecolor='black')
+    ax0.bar(plt_df.index,plt_df[gene_df.columns[0]],align='center',color='black',edgecolor='black')
+    ax1.bar(plt_df.index,plt_df[gene_df.columns[0]],align='center',color='black',edgecolor='black')
     # limit the view
     ax0.set_ylim(ylim1)
     ax1.set_ylim(ylim2)
@@ -417,15 +426,32 @@ def plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,ylim1
     ax0.axvline(cds_end-more_shift, color='yellow',linestyle='--',label='cds_end')
     handles, labels = ax0.get_legend_handles_labels()
     ax0.legend(handles[-4:], labels[-4:])
+#     # NeoR plot
+#     ax0.axvline(168-more_shift,color='black',linestyle='--',label='alter_cds_start')
+#     ax0.axvline(326-more_shift,color='orange',linestyle='--',label='alter_cds_end')
+#     ax0.axvline(327-more_shift,color='black',linestyle='--',label='alter_cds_start')
+#     ax0.axvline(713-more_shift,color='orange',linestyle='--',label='alter_cds_end')
+#     ax0.axvline(717-more_shift,color='black',linestyle='--',label='alter_cds_start')
+#     ax0.axvline(818-more_shift,color='orange',linestyle='--',label='alter_cds_end')
+#     handles,labels = ax0.get_legend_handles_labels()
+#     ax0.legend(handles[-10:-4],labels[-10:-4])
+#     ax1.axvline(168-more_shift,color='black',linestyle='--',label='alter_cds_start')
+#     ax1.axvline(326-more_shift,color='orange',linestyle='--',label='alter_cds_end')
+#     ax1.axvline(327-more_shift,color='black',linestyle='--',label='alter_cds_start')
+#     ax1.axvline(713-more_shift,color='orange',linestyle='--',label='alter_cds_end')
+#     ax1.axvline(717-more_shift,color='black',linestyle='--',label='alter_cds_start')
+#     ax1.axvline(818-more_shift,color='orange',linestyle='--',label='alter_cds_end')
+    
     for s,e in zip(ex_start,ex_end):
         ax1.axvline(s-more_shift, color='red', linestyle='--',label='exon_start')
         ax1.axvline(e-more_shift, color='blue',linestyle='--',label='exon_end')
     ax1.axvline(cds_start-more_shift, color='green',linestyle='--',label='cds_start')
     ax1.axvline(cds_end-more_shift, color='yellow',linestyle='--',label='cds_end')
     
-    ax0.set_title('{name} position coverage at day3 (Riboseq)'.format(name=genename))
+    
+    ax0.set_title('{name} position coverage at {day} (Riboseq)'.format(name=genename,day=gene_df.columns.tolist()[0]))
     plt.xlabel('gene position')
-    plt.ylabel('tpm')
+    plt.ylabel('rpm')
     plt.savefig(outFile+'.svg')
     plt.savefig(outFile+'.pdf')
     
@@ -450,8 +476,8 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
     print 'cds start is:',cds_start
     print 'cds end is:', cds_end
     gene_df = pd.DataFrame()
-    gene_df['day3'] = merge_rep_gene_pos_cov(totalCount[0:3],covFiles[0:3],gene,exn_df,covType)
-    #gene_df['day6'] = merge_rep_gene_pos_cov(totalCount[3:6],covFiles[3:6],gene,exn_df,covType)
+    #gene_df['day3'] = merge_rep_gene_pos_cov(totalCount[0:3],covFiles[0:3],gene,exn_df,covType)
+    gene_df['day6'] = merge_rep_gene_pos_cov(totalCount[3:6],covFiles[3:6],gene,exn_df,covType)
     #-------------- 3) plot figure -----------------------------
     plt_df = gene_df.copy()
     if shift != 0 or more_shift !=0:
@@ -465,7 +491,7 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
     f = plt.figure()
     f.set_size_inches(14.5,8)
     ax = plt.subplot(111)
-    ax.bar(plt_df.index,plt_df['day3'],align='center',color='black',edgecolor='black')
+    ax.bar(plt_df.index,plt_df[gene_df.columns[0]],align='center',color='black',edgecolor='black')
     if scale == 'log':
         ax.set_yscale('log',basey=10)
     if ylim!=[]:
@@ -479,9 +505,9 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles[-4:], labels[-4:])
     
-    ax.set_title('{name} position coverage at day3 ({seqtype})'.format(name=genename,seqtype=seqtype))
+    ax.set_title('{name} position coverage at {day} ({seqtype})'.format(name=genename,seqtype=seqtype,day=gene_df.columns[0]))
     plt.xlabel('gene position')
-    plt.ylabel('tpm')
+    plt.ylabel('rpm')
     plt.savefig(outFile +'.pdf')
     plt.savefig(outFile +'.svg')
 
@@ -493,7 +519,7 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
 # for bam in bamFiles:
 #     handle = pysam.AlignmentFile(bam,'rb')
 #     totalCount.append(handle.mapped)
-# #-------------- 2) get genes aand set all parameters -----------------------
+# #-------------- 2) get genes and set all parameters -----------------------
 # fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/04_gene_total_count/s05_cov_geneCount.txt'
 # df = pd.read_csv(fn,sep='\t',header=0)
 # df = df.sort(['count'])
@@ -505,26 +531,29 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
 # os.chdir(fwd_rev_path)
 # covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
 # covFiles = natsorted(covFiles)
-# #-------------- 4) plot Eef1a1 ribo ------------------
+# # #-------------- 4) plot Eef1a1 ribo ------------------
 # ylim1 = [300,910]
 # ylim2 = [0,75]
 # hp = 0.05
 # dy0_times = 25  # this is for the slip of diagnal line that connecting broken axis
 # dy1_times = 1
-# outFile = fig_path + '/07_Eef1a1_ribo_day3_cov'
-# plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene1,'Eef1a1',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
-# # outFile = fig_path + '/08_Eef1a1_ribo_day3_cov_align'
-# # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene1,'Eef1a1',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,15,34)
+# # outFile = fig_path + '/07_Eef1a1_ribo_day3_cov'
+# # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene1,'Eef1a1',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
+# ylim1= [70,500]
+# outFile = fig_path + '/15_Eef1a1_ribo_day6_cov_align'
+# plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene1,'Eef1a1',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,15,34)
 # #-------------- 5) plot heavychain ribo ------------------
 # ylim1 = [8000,9100]
 # ylim2 = [0,3000]
 # hp = 0.05
 # dy0_times = 10  # this is for the slip of diagnal line that connecting broken axis
 # dy1_times = 9
-# outFile = fig_path + '/07_heavychain_ribo_day3_cov'
 # gene = 'heavychain'
-# plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'heavychain',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
-# outFile = fig_path + '/08_heavychain_ribo_day3_cov_align'
+# # outFile = fig_path + '/07_heavychain_ribo_day3_cov'
+# # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'heavychain',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
+# ylim1=[600,1500]
+# ylim2=[0,500]
+# outFile = fig_path + '/15_heavychain_ribo_day6_cov_align'
 # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'heavychain',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,15,233)
 # #-------------- 6) plot lightchain ribo ------------------
 # ylim1 = [700,800]
@@ -532,10 +561,12 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
 # hp = 0.05
 # dy0_times = 5  # this is for the slip of diagnal line that connecting broken axis
 # dy1_times = 9
-# outFile = fig_path + '/07_lightchain_ribo_day3_cov'
 # gene = 'lightchain'
-# plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'lightchain',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
-# outFile = fig_path + '/08_lightchain_ribo_day3_cov_align'
+# # outFile = fig_path + '/07_lightchain_ribo_day3_cov'
+# # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'lightchain',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
+# ylim1=[65,120]
+# ylim2=[0,50]
+# outFile = fig_path + '.;/15_lightchain_ribo_day6_cov_align'
 # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'lightchain',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,15,88)
 # #-------------- 7) plot NeoRkanR ribo ------------------
 # ylim1 = [1500,9000]
@@ -543,11 +574,18 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
 # hp = 0.05
 # dy0_times = 19  # this is for the slip of diagnal line that connecting broken axis
 # dy1_times = 1
-# outFile = fig_path + '/07_NeoR_ribo_day3_cov'
 # gene = 'NeoRKanR'
-# plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
-# outFile = fig_path + '/08_NeoR_ribo_day3_cov_align'
+# # outFile = fig_path + '/07_NeoR_ribo_day3_cov'
+# # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,0,0)
+# ylim1=[800,2000]
+# ylim2=[0,600]
+# outFile = fig_path + '/15_NeoR_ribo_day6_cov_align'
 # plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,16,154)
+# #---------------- including the alternative plot -----------------------
+# gene = 'NeoRKanR'
+# outFile = fig_path + '/14_NeoR_ribo_day3_cov_alter_align'
+# plot_cds_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',ylim1,ylim2,hp,dy0_times,dy1_times,outFile,16,154)
+
 # #------------------- use log scale ----------------
 # gene = gene1
 # outFile = fig_path + '/09_Eef1a1_day3_ribo_log_cov'
@@ -588,27 +626,27 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
 # covFiles = natsorted(covFiles)
 # #-------------- 3) plot Eef1a1 rna ------------------
 # gene = '100689276'
-# outFile = fig_path + '/07_Eef1a1_day3_rna_cov'
-# plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'Eef1a1',outFile,[],'RNAseq','',0,0)
-# outFile = fig_path + '/08_Eef1a1_day3_rna_cov_align'
+# # outFile = fig_path + '/07_Eef1a1_day3_rna_cov'
+# # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'Eef1a1',outFile,[],'RNAseq','',0,0)
+# outFile = fig_path + '/16_Eef1a1_day6_rna_cov_align'
 # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'Eef1a1',outFile,[],'RNAseq','',0,34)
 # #-------------- 4) plot heavychain rna ------------------
 # gene = 'heavychain'
-# outFile = fig_path + '/07_heavychain_day3_rna_cov'
-# plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'heavychain',outFile,[],'RNAseq','',0,0)
-# outFile = fig_path + '/08_heavychain_day3_rna_cov_align' 
+# # outFile = fig_path + '/07_heavychain_day3_rna_cov'
+# # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'heavychain',outFile,[],'RNAseq','',0,0)
+# outFile = fig_path + '/16_heavychain_day6_rna_cov_align' 
 # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'heavychain',outFile,[],'RNAseq','',0,233)
 # #-------------- 5) plot lightchain rna ------------------
 # gene = 'lightchain'
-# outFile = fig_path + '/07_lightchain_day3_rna_cov'
-# plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'lightchain',outFile,[],'RNAseq','',0,0)
-# outFile = fig_path + '/08_lightchain_day3_rna_cov_align'
+# # outFile = fig_path + '/07_lightchain_day3_rna_cov'
+# # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'lightchain',outFile,[],'RNAseq','',0,0)
+# outFile = fig_path + '/16_lightchain_day6_rna_cov_align'
 # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'lightchain',outFile,[],'RNAseq','',0,88)
 # #-------------- 6) plot NeoR rna ------------------
 # gene = 'NeoRKanR'
-# outFile = fig_path + '/07_NeoR_day3_rna_cov'
-# plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',outFile,[],'RNAseq','',0,0)
-# outFile = fig_path + '/08_NeoR_day3_rna_cov_align'
+# # outFile = fig_path + '/07_NeoR_day3_rna_cov'
+# # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',outFile,[],'RNAseq','',0,0)
+# outFile = fig_path + '/16_NeoR_day6_rna_cov_align'
 # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',outFile,[],'RNAseq','',0,154)
 # #---------- log coverage ------
 # gene = '100689276' # [0.1,10000],'Riboseq','log'
@@ -636,9 +674,23 @@ def plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,genename,outFi
 # plot_rna_cov(exnFile,cdsFile,totalCount,covFiles,covType,gene,'NeoR',outFile,[0.1,1000],'RNAseq','log',0,154)
 # plt.show()
 #===============================================================================
-#                         11. coverage plot in sub region
+#                         11. coverage plot in sub region (for Eef1a1, heavychain,lightchain,NeoRKanR)
 #===============================================================================
 def sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,gene,refFaFile,outFile1,outFile2):
+    """This function plot some sub regions of some genes. Aiming to show the codon periodicity coverage of Riboseq
+    
+    * cdsFile: str. File name of the cds information
+    * exnFile: str. File name of the exon information
+    * totalCount: list. A list of integers indicating total number of reads
+    * covFiles: list. A list of position covergae for each gene.
+    * cds_pos: list. A list of CDS position relative to chromosome.
+    * utr_pos: list. A list of utr positions.
+    * covType: str. If is gene, it will include the introns.
+    * gene: str. gene name
+    * refFaFile: str. Fasta file that has reference sequence.
+    * outFile1: str. Plot the CDS subregion plot
+    * outFile2: str. Plot the 3'UTR subrergion plot
+    """
     # get pr pos
     cds_df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)
     gene_df = cds_df[cds_df['GeneID'].values==gene]
@@ -684,7 +736,7 @@ def sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,
     plt.figure()
     ax = plt_df.loc[utr_pos]['day3'].plot(kind='bar',title='3UTR region pattern')
     ax.set_xticklabels(utr_x)
-    plt.savefig(outFile2) #fig_path+'/11_Eef1a1_3UTR_day3_cov.svg')
+    plt.savefig(outFile2) # fig_path+'/11_Eef1a1_3UTR_day3_cov.svg')
 # #-------------- 1) get total count --------------------
 # os.chdir(bam_path)
 # bamFiles = [f for f in os.listdir(bam_path) if f.endswith('.sort.bam')]
@@ -713,22 +765,235 @@ def sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,
 # outFile2 = fig_path+'/11_heavychain_3UTR_day3_cov.svg'
 # sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,gene,refFaFile,outFile1,outFile2)
 # 
-# cds_pos = range(430,451) # these position are relative to start of gene 617,638
+# cds_pos = range(430,451) # these positions are relative to start of gene 617,638
 # utr_pos = range(1042,1063)
 # gene = 'lightchain'
 # outFile1 = fig_path+'/11_lightchain_cds_day3_cov.svg'
 # outFile2 = fig_path+'/11_lightchain_3UTR_day3_cov.svg'
 # sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,gene,refFaFile,outFile1,outFile2)
 # 
-# cds_pos = range(385,406) # these position are relative to start of gene 617,638
+# cds_pos = range(385,406) # these positions are relative to start of gene 617,638
 # utr_pos = range(1020,1041)
 # gene = 'NeoRKanR'
 # outFile1 = fig_path+'/11_NeoR_cds_day3_cov.svg'
 # outFile2 = fig_path+'/11_NeoR_3UTR_day3_cov.svg'
 # sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,gene,refFaFile,outFile1,outFile2)
 # plt.show()
+# #===============================================================================
+# #                         12. count fraction for different frame to show coverage periodicity (only consider Eef1a1, heavychain,lightchain,NeoR)
+# #===============================================================================
+#------------------- 1. get read coverage information file ------------------
+os.chdir(fwd_rev_path)
+covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
+covFiles = natsorted(covFiles)
+outpath = signalP_path + '/01_tr_ribo_pos_cov'
+outFile1 = signalP_path + '/13_cds_frame_fraction.csv'
+outFile2 = signalP_path + '/13_utr5_frame_fraction.csv'
+outFile3 = signalP_path + '/13_utr3_frame_fraction.csv'
+ 
+genes = ['100689276','heavychain','lightchain','NeoRKanR']
+#------------------- 2. get coverage percentage for each frame in coding region ------------------
+# get the position coverage for each transcript
+# for f in covFiles:
+#     gene_tr_cov(exnFile,cdsFile,all_id_file,f,outpath,genes,'yes',ribo_offset_file)
+# get cds positions, whole transcript positions
+cds_df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)
+cds_obj = trpr(cds_df)
+exn_df = pd.read_csv(exnFile,sep='\t',header=0,low_memory=False)
+exn_obj = trpr(exn_df)
+# get frame coverage
+os.chdir(outpath)
+pr_pos_cov_files = [f for f in os.listdir(outpath) if f.endswith('trpos.txt')]
+pr_pos_cov_files = natsorted(pr_pos_cov_files)
+# 1) cds frame calculation
+frame_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+utr5_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+utr3_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+for f in pr_pos_cov_files:
+    handle = open(f,'r')
+    # loop for genes
+    for line in handle:
+        item = line[:-1].split('\t')
+        geneid = item[0]
+        trid = item[1]
+        prid = item[2]
+        # get distance between tr and pr
+        tr_pos = exn_obj.get_trpr_pos(trid)
+        pr_pos = cds_obj.get_trpr_pos(prid)
+        s_index = tr_pos.index(pr_pos[0])
+        e_index = tr_pos.index(pr_pos[-1])
+           
+        cov = item[3:]
+        # 1) cds coverage calculation
+        cds_cov = cov[s_index:e_index+1]
+        sum_count = sum([int(p) for p in cds_cov])
+        # loop for each position
+        frames = frame_count(cds_cov)
+        frame_df.loc[geneid+'_'+f[:3]]=frames
+        # 2) 5' UTR frame
+        utr5_cov = cov[:s_index]
+        if len(utr5_cov) == 1:
+            utr5_cov = utr5_cov[1:]
+        elif len(utr5_cov) == 2:
+            utr5_cov = utr5_cov[2:]
+        sum5_count = sum([int(p) for p in utr5_cov])
+        frames = frame_count(utr5_cov)
+        if sum5_count == 0:
+            print geneid,'dones not have 5 utr'
+            utr5_df.loc[geneid+'_'+f[:3]] = [0] * 3
+        else:
+            utr5_df.loc[geneid+'_'+f[:3]]=[frame/float(sum5_count) for frame in frames]
+        # 3) 3' UTR frame
+        utr3_cov = cov[e_index+1:]
+        if len(utr3_cov) == 1:
+            utr3_cov = utr3_cov[:-1]
+        elif len(utr3_cov) == 2:
+            utr3_cov = utr3_cov[:-2]
+        sum3_count = sum([int(p) for p in utr3_cov])
+        frames = frame_count(utr3_cov)
+        if sum3_count == 0:
+            print geneid,'does not have 3 utr'
+            utr3_df.loc[geneid+'_'+f[:3]] = [0] * 3
+        else:
+            utr3_df.loc[geneid+'_'+f[:3]]=[frame/float(sum3_count) for frame in frames]
+   
+frame_df = frame_df.sort_index()
+print frame_df
+# frame_df.to_csv(outFile1,sep='\t')
+# 
+# utr5_df = utr5_df.sort_index()
+# utr5_df.to_csv(outFile2,sep='\t')
+#   
+# utr3_df = utr3_df.sort_index()
+# utr3_df.to_csv(outFile3,sep='\t')
+#------------------- 3. plot the frame ----------------------------
+def frame_plot(frameFile,outFile,title):
+    # 1) plot cds freame
+    df = pd.read_csv(frameFile,sep='\t',index_col=0,header=0)
+    genes = df.index.tolist()
+    # get uniuqe genes
+    genes = [g.split('_')[0] for g in genes]
+    genes = list(set(genes))
+    mean_df = pd.DataFrame()
+    std_df = pd.DataFrame()
+    for g in genes:
+        cri = df.index.map(lambda x: g in x)
+        g_df = df[cri]
+        g_df = g_df.T # column is gene id of each replicate, row is frame
+        mean_df[g] = g_df.mean(axis=1)
+        std_df[g] = g_df.std(axis=1)
+    mean_df.plot(kind='bar',subplots=True,layout=(2,2),figsize=(10, 8),title=title,yerr=std_df,legend=False)
+    plt.savefig(outFile+'.pdf')
+    plt.savefig(outFile+'.svg')
+# frame_plot(outFile1,fig_path+'/12_cds_frame','CDS frame percentage')
+# frame_plot(outFile2,fig_path+'/12_utr5_frame','5UTR frame percentage')
+# frame_plot(outFile3,fig_path+'/12_utr3_frame','3UTR frame percentage')
+# plt.show()
+# #------------------- 4. plot the frame for NeoR for nts that only in main CDS not in alternate CDS ----------------------------
+# out_path = '/data/shangzhong/RibosomeProfiling/signalP_part/01_tr_ribo_pos_cov'
+# os.chdir(out_path)
+# pr_pos_cov_files = [f for f in os.listdir(out_path) if f.endswith('trpos.txt')]
+# pr_pos_cov_files = natsorted(pr_pos_cov_files)
+def NeoR_frame_cov(pr_pos_cov_files,start,end,add=[],calType='sum'):
+    """frame coverage only for NeoR
+    * pr_pos_cov_files: list. A list of files with transcript position coverage.
+    * start: int. Start position of interested region.
+    * end: int. End position of interested region.
+    * calType: str. if sum, it plots sum coverage of each frame.
+                    if median, it plits median coverage of each frame.
+    """
+    frame_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+    for f in pr_pos_cov_files:
+        handle = open(f,'r')
+        for line in handle:
+            item = line[:-1].split('\t')
+            geneid = item[0]
+            if geneid == 'NeoRKanR':
+                cov = item[3:]     # get coverage
+                cov = [float(p) for p in cov]
+                cds_cov = cov[start:end]  # coverage of interested region
+                cds_cov = add + cds_cov
+                print len(cds_cov)
+                sum_count = sum(cds_cov)
+                sum_count = sum_count
+                if calType != 'sum':
+                    sum_count = 1
+                frames = frame_count(cds_cov,calType)
+                frame_df.loc[geneid+'_'+f[:3]]=[frame/float(sum_count) for frame in frames]
+    cov_mean = frame_df.mean().tolist()
+    cov_std = frame_df.std().tolist()
+    print frame_df
+     
+    return cov_mean,cov_std
+ 
+# x = [1,2,3]
+# tick = ['frame1','frame2','frame3']
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,154,167)
+# f, ((ax1, ax2,ax3), (ax4,ax5,ax6),(ax7,ax8,ax9)) = plt.subplots(3,3)
+# f.set_size_inches(18.5, 10.5)
+#  
+# ax1.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')#1F77B4
+# ax1.set_xticks(x)
+# ax1.set_xticklabels(tick)
+# ax1.set_title('NeoR 155:167')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,167,326,[0])
+# ax2.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax2.set_xticks(x)
+# ax2.set_xticklabels(tick)
+# ax2.set_title('NeoR 168:326')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,326,713,[0])
+# ax3.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax3.set_xticks(x)
+# ax3.set_xticklabels(tick)
+# ax3.set_title('NeoR 327:713')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,716,818,[0])
+# ax4.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax4.set_xticks(x)
+# ax4.set_xticklabels(tick)
+# ax4.set_title('NeoR 717:818')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,818,949,[0])
+# ax5.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax5.set_xticks(x)
+# ax5.set_xticklabels(tick)
+# ax5.set_title('NeoR 819:949')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,154,326)
+# ax6.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax6.set_xticks(x)
+# ax6.set_xticklabels(tick)
+# ax6.set_title('NeoR 155:326')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,154,713)
+# ax7.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax7.set_xticks(x)
+# ax7.set_xticklabels(tick)
+# ax7.set_title('NeoR 155:713')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,154,818)
+# ax8.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax8.set_xticks(x)
+# ax8.set_xticklabels(tick)
+# ax8.set_title('NeoR 155:818')
+#  
+# cov_mean,cov_std = NeoR_frame_cov(pr_pos_cov_files,154,949)
+# ax9.bar(x,cov_mean,align='center',yerr=cov_std,color='#AEC7E8')
+# ax9.set_xticks(x)
+# ax9.set_xticklabels(tick)
+# ax9.set_title('NeoR 155:949')
+#  
+# f.suptitle("frame is based on main ORF", fontsize=14)
+# plt.savefig(fig_path + '/13_NeoR_periodicity.svg')
+# plt.savefig(fig_path + '/13_NeoR_periodicity.pdf')
+# 
+# plt.show()
+
 #===============================================================================
-#                         12. RNA coverage VS ribo coverage (for rpkm or rpm)
+#                         13. RNA coverage VS ribo coverage (for rpkm or rpm) scatter plot
 #===============================================================================
 def rpm_condition(totalCount,count_files,covType='rpm'):
     """This function calculates the rpm for each gene and merge the replicates
@@ -748,7 +1013,12 @@ def rpm_condition(totalCount,count_files,covType='rpm'):
     res_df.index = df.index
     res_df['mean'] = res_df.mean(axis=1)
     return res_df['mean']
+
 def trans_effi_plot(gene_count_path,rna_gene_count_path,bam_path,covType):
+    """This function calculates the rpm and rpkm for each gene of RNAseq and Riboseq at day3 and day6,
+    and then plot a scatter plot of rna vs ribo.
+    
+    """
     #---------------- 1. read ribo count files ------------
     ribo_gene_count_files = [f for f in os.listdir(gene_count_path) if f.endswith('Count.txt')]
     ribo_gene_count_files = natsorted(ribo_gene_count_files)
@@ -875,12 +1145,14 @@ def trans_effi_plot(gene_count_path,rna_gene_count_path,bam_path,covType):
     plt.savefig(fig_path + '/04_day6_rna_vs_ribo_' + covType + '.pdf')
     plt.savefig(fig_path + '/04_day6_rna_vs_ribo_' + covType + '.svg')
     #plt.show()
-    
 # trans_effi_plot(gene_count_path,rna_gene_count_path,bam_path,'rpm')
 # trans_effi_plot(gene_count_path,rna_gene_count_path,bam_path,'rpkm')
 
 #===============================================================================
-#                         13. RNA coverage VS ribo coverage (only for sp genes and in percentage) 
+#                         14. RNA coverage VS ribo coverage (only for sp genes and in percentage)
+#             It plots scatter plots for day3 and day6. In the figure,each dot represents one gene, 
+#             the axis values means how many perentages
+#             does each gene take in the whole rna or ribo pool.
 #===============================================================================
 # #---------------- 1. read ribo count files ------------
 # ribo_gene_count_files = [f for f in os.listdir(gene_count_path) if f.endswith('Count.txt')]
@@ -961,10 +1233,71 @@ def trans_effi_plot(gene_count_path,rna_gene_count_path,bam_path,covType):
 # plt.savefig(fig_path + '/06_day6_rna_vs_ribo_percent.pdf')
 # plt.savefig(fig_path + '/06_day6_rna_vs_ribo_percent.svg')  
 # plt.show()
+#===============================================================================
+#                         15. merge the stallsites for recombinant genes
+#===============================================================================
+# os.chdir(stall_site_path)
+# files = [f for f in os.listdir(stall_site_path) if f.endswith('stallsites.txt')]
+# files = natsorted(files)
+# genes = ['heavychain','lightchain','NeoRKanR']
+# 
+# dfs = []
+# for f in files:
+#     df = pd.read_csv(f,sep='\t',header=0,names=['Chr','GeneID','Chr_pos','Pr_Access','Pr_pos',f[:3]])
+#     df = df[df['GeneID'].isin(genes)]
+#     df = df.set_index(['Chr','GeneID','Chr_pos','Pr_Access','Pr_pos'])
+#     dfs.append(df)
+# merge_df = pd.concat(dfs,axis=1)
+# merge_df.to_csv(signalP_path + '/15_recom_genes_stall_sties.csv',sep='\t')
+# print merge_df
+
+# #===============================================================================
+# #                         16. plot frame coverage
+# #===============================================================================
+# os.chdir(frame_cov_path)
+# frame_files = [f for f in os.listdir(frame_cov_path) if f.endswith('frame.txt')]
+# frame_files = natsorted(frame_files)
+# frame_df = []
+# row = 2; col = 3
+# fig,axes = plt.subplots(row,col,sharex=True,figsize=(14.5,8))
+# names = []
+# for f in frame_files:
+#     df = pd.read_csv(f,sep='\t',header=0,index_col=0)
+#     frame_df.append(df)
+#     names.append(f[:3])
+# for i in range(row):
+#     for j in range(col):
+#         df = frame_df[i*col+j]
+#         df.plot(kind='box',ax=axes[i,j],title=names[i*col+j])
+#         cri = df.index.map(lambda x: x in ['NeoRKanR','heavychain','lightchain'])
+#         recom_df = df[cri]
+#         columns = recom_df.columns
+#         num = len(columns)
+#         for n in range(num):
+#             p1,p2,p3 = axes[i,j].plot([n+1.1],recom_df.iloc[0,n],'r.',[n+1.05],recom_df.iloc[1,n],'g.',[n+0.95],recom_df.iloc[2,n],'b.')
+# fig.legend((p1,p2,p3),('NeoR','heavy','light'),'upper left')
+# outFile = fig_path + '/17_frame_cov'
+# plt.savefig(outFile+'.svg')
+# plt.savefig(outFile+'.pdf')
+# # plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ########## rewrite here ###############
 #===============================================================================
-#                          14. plot metagene coverage for sp, non sp, antibody at codon level, 5 needs minutes.
+#                          15. plot metagene coverage for sp, non sp, antibody at codon level, 5 needs minutes.
 #===============================================================================
 def groupCodonCovRep(coverFiles,chrCoverFiles,window,genes='',calType='total'):
     # 1. get totalcount

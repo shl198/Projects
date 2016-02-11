@@ -23,7 +23,7 @@ fwd_rev_path = bam_path + '/01_cov'
 tss_tse_cov_path = bam_path + '/02_TSS_TSE_cov'
 pr_pos_cov_path = bam_path + '/03_pr_pos_cov_path'
 # other parameters
-up = 300; down = 300
+up = 50; down = 50
 
 
 os.chdir(bam_path)
@@ -158,8 +158,9 @@ def groupCovForPosRep(files,totalCounts,up,down,calType='total'):
         df = pd.read_csv(f,sep='\t',header=0,index_col=0,low_memory=False)
         # remove the antibody, signal peptide and non signal peptide are separate
         try:
-            df = df.drop('heavychain');df=df.drop('lightchain');df=df.drop('NeoRKanR')
+            #df = df.drop('heavychain');df=df.drop('lightchain');df=df.drop('NeoRKanR')
             #df = df.loc[['heavychain','lightchain']]
+            df = df.loc[['lightchain'],:]
         except:
             pass
         # filter by median of gene
@@ -234,13 +235,13 @@ cdsFile = db_path + '/01_pr_cds.txt'
 #TSS_TSE_coverage(covFiles[0],cdsFile,tss_tse_cov_path,up,down,20)
 lens = align_lengths(covFiles) # get all lengths
 lens.append(0)
-for l in lens:
-    tsse_path = tss_tse_cov_path + '/' + str(l)
-    proc = [Process(target=TSS_TSE_coverage,args=(covFile,cdsFile,tsse_path,up,down,l,)) for covFile in covFiles]
-    for p in proc:
-        p.start()
-    for p in proc:
-        p.join()
+# for l in lens:
+#     tsse_path = tss_tse_cov_path + '/' + str(l)
+#     proc = [Process(target=TSS_TSE_coverage,args=(covFile,cdsFile,tsse_path,up,down,l,)) for covFile in covFiles]
+#     for p in proc:
+#         p.start()
+#     for p in proc:
+#         p.join()
 #======================== 2. plot the coverage (results in folder figures)===============    
 
 #-------------- 1) get total count --------------------
@@ -293,8 +294,8 @@ for l in lens:
     plt.savefig(bam_path+'/figures/'+str(l)+'.png')
     plt.savefig(bam_path+'/figures/'+str(l)+'.svg')
 
-#======================== 3. plot the coverage for each bam file (results in folder ) ===============
-
+#======================== 3. plot the coverage for each bam file (results in folder 02_TSS_TSE_cov) ===============
+"""
 #-------------- 1) get total count --------------------
 os.chdir(bam_path)
 calType = 'total'
@@ -324,7 +325,7 @@ for l in lens:
     plot_tsse(tss_df,'distance from TSS',ylabel,'TSS coverage at lenght {len}'.format(len=str(l)),file_len,up,down,tss_tse_cov_path+'/'+str(l)+'_tss.png')
     plot_tsse(tse_df,'distance from TSE',ylabel,'TSE coverage at lenght {len}'.format(len=str(l)),file_len,up,down,tss_tse_cov_path+'/'+str(l)+'_tse.png')
     print 'done'
-
+"""
 
 
 

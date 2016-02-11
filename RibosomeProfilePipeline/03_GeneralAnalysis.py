@@ -2,7 +2,7 @@ import pysam
 import os,subprocess,sys
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from natsort import natsorted
@@ -11,28 +11,36 @@ from multiprocessing import Process,Pool
 from Bio import SeqIO
 from scipy import stats
 
+import pdb
 #=============== parameters =======================
+#------ need to define manually ----------
 ribo_offset_file = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/02_TSS_TSE_cov/ribo_offset.txt'
 bam_path = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam'
 db_path = '/data/shangzhong/RibosomeProfiling/Database'
+rna_bam_path = '/data/shangzhong/RibosomeProfiling/TotalRNA_align'
+#----- don't need to define manually -----
 general_path = bam_path + '/general_files'
 fig_path = bam_path + '/figures'
 
 fwd_rev_path = bam_path + '/01_cov'
-pr_cov_path = bam_path + '/03_pr_pos_cov'    # store results from part 1.
+pr_cov_path = bam_path + '/03_pr_pos_cov'    # store results from part 1
 gene_count_path = bam_path + '/04_gene_total_count' 
 stall_path = bam_path + '/05_stall_sites'
 codon_AA_freq_path = bam_path + '/06_codon_AA_freq'
 utr3_cov_path = bam_path + '/07_utr3_cov'
+pr_ntcov_path = bam_path + '/08_pr_ntpos_cov'
+frame_cov_path = bam_path + '/09_frame_cov'
 
 all_id_file = db_path + '/combined_AllIDS.txt'  # part 8
 cdsFile = db_path + '/01_pr_cds.txt' # part 8
 exnFile = db_path + '/01_pr_rna.txt' # part 8
 # rna
-rna_bam_path = '/data/shangzhong/RibosomeProfiling/TotalRNA_align'
 rna_count_path = rna_bam_path + '/01_gene_count'
 
-
+def chunk(l,n):
+    n = max(1,n)
+    res = [l[i:i+n] for i in range(0,len(l),n)]
+    return res
 #===============================================================================
 #                     1. get position coverage for each A site for all protiens. Results stored in folder 03_pr_pos_cov
 #===============================================================================
@@ -41,11 +49,18 @@ rna_count_path = rna_bam_path + '/01_gene_count'
 # covFiles = natsorted(covFiles)
 # cdsFile = db_path + '/01_pr_cds.txt'
 # #gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,pr_cov_path+'/old')
+# #------------- pr_pos_cov ------------
 # proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,pr_cov_path,)) for covFile in covFiles]
 # for p in proc:
 #     p.start()
 # # for p in proc:
 # #     p.join()
+# #------------- pr_ntpos_cov ------------
+# proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,pr_ntcov_path,'pos',[],'nt',)) for covFile in covFiles]
+# for p in proc:
+#     p.start()
+# for p in proc:
+#     p.join()
 # 
 # #===============================================================================
 # #                     2. gene total ribosome count for each gene (restuls in 04_gene_total_count)
@@ -340,4 +355,17 @@ plt.savefig(fig_path + '/04_AA_freq.svg')
 #     p.start()
 # for p in proc:
 #     p.join()
+# #===============================================================================
+# #                         9. frame coverage of each frame
+# #===============================================================================
+# os.chdir(pr_ntcov_path)
+# covFiles = [f for f in os.listdir(pr_ntcov_path) if f.endswith('txt')]
+# covFiles = natsorted(covFiles)
+# # genes_frame_cov(covFiles[0],frame_cov_path,genes=['heavychain'],calType='sum')
+# proc = [Process(target=genes_frame_cov,args=(f,frame_cov_path)) for f in covFiles]
+# for p in proc:
+#     p.start()
+# for p in proc:
+#     p.join()
+
 
