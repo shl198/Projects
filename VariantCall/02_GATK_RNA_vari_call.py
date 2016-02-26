@@ -9,7 +9,7 @@ sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from Modules.f00_Message import Message
 from Modules.f01_list_trim_fq import list_files,Trimmomatic
-from Modules.f02_aligner_command import STAR2Pass
+from Modules.f02_aligner_command import STAR2Pass,STAR_Db
 from Modules.f03_samtools import sam2bam_sort
 from Modules.f07_picard import markduplicates,addReadGroup
 from Modules.f08_GATK import *
@@ -19,7 +19,7 @@ from Modules.p01_FileProcess import remove,get_parameters,rg_bams
    different samples, should only change this part for 
    running pipeline
 """
-#parFile = '/data/shangzhong/VariantCall/GlycoKO/rest/GATK_parameters4DNAandRNA.txt'
+#parFile = '/data/shangzhong/DNArepair/RNA/GATK_parameters4DNAandRNA.txt'
 parFile = sys.argv[1]
 param = get_parameters(parFile)
 thread = param['thread']
@@ -49,13 +49,19 @@ Message(startMessage,email)
 #========  (1) read files  ================================
 fastqFiles = list_files(file_path)
 if trim == 'True':
-    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter,batch=6)
+    trim_fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter,batch=6)
+    remove(fastqFiles)
+else:
+    trim_fastqFiles = fastqFiles
 sys.stdout.write('list file succeed\n')
-sys.stdout.write('fastqFiles is: {fq}\n'.format(fq=fastqFiles))
+sys.stdout.write('fastqFiles is: {fq}\n'.format(fq=trim_fastqFiles))
 
 #========  (2) align using 2 pass STAR ====================
 try:
-    map_sams= STAR2Pass(fastqFiles,starDb,ref_fa,thread)
+    if not os.path.exists(starDb): os.mkdir(starDb)
+    if os.listdir(starDb) == []:
+        STAR_Db(starDb,ref_fa,thread)
+    map_sams= STAR2Pass(trim_fastqFiles,starDb,ref_fa,thread)
     sys.stdout.write('align succeed\n')
     sys.stdout.write('map_sams is: {map}\n'.format(map=map_sams))
 except:
@@ -64,24 +70,23 @@ except:
     raise
 #========  2. Add read groups, sort,mark duplicates, and create index
 #========  (1) sort and add group =========================
+# try:
+#     sort_bams = sam2bam_sort(map_sams,thread)
+#     sys.stdout.write('sort bam succeed\n')
+#     sys.stdout.write('sort_bams is: {bam}\n'.format(bam=sort_bams))
+#     remove(map_sams)
+# except:
+#     sys.stdout.write('sort bam failed\n')
+#     Message('sort bam failed',email)
+#     raise
 try:
-    sort_bams = sam2bam_sort(map_sams,thread)
-    sys.stdout.write('sort bam succeed\n')
-    sys.stdout.write('sort_bams is: {bam}\n'.format(bam=sort_bams))
-except:
-    sys.stdout.write('sort bam failed\n')
-    Message('sort bam failed',email)
-    raise
-
-try:
-    group_bams = addReadGroup(picard,sort_bams,read_group,batch=9) 
+    group_bams = addReadGroup(picard,map_sams,read_group,batch=9) 
     sys.stdout.write('add group succeed\n')
     sys.stdout.write('group_bams is: {group}\n'.format(group=group_bams))
 except:
     sys.stdout.write('add group failed\n')
     Message('add group failed',email)
     raise
-
 #========  (2) mark duplicates ============================
 try:
     dedup_bams = markduplicates(picard,group_bams)
@@ -152,14 +157,13 @@ except:
 #========  5. Base quality recalibration  =================
 try:
     recal_bams = RNA_BaseRecalibrator(gatk,realign_bams,ref_fa,
-                gold_varis,roundNum,thread,batch=3)
+                gold_varis,roundNum,thread,batch=4)
     sys.stdout.write('recalibration succeed\n')
     sys.stdout.write('recal_bams is: {recal}\n'.format(recal=recal_bams))
 except:
     sys.stdout.write('recalibration failed\n')
     Message('recalibration failed',email)
     raise
-
 #========  !!! merge lanes for the same sample ============
 if len(recal_bams) !=1:
     try:
@@ -170,6 +174,7 @@ if len(recal_bams) !=1:
         sys.stdout.write('merge failed\n')
         Message('merge failed',email)
         raise
+    remove(realign_bams)
     try:
         dedup_files = markduplicates(picard,merged_bams)
         sys.stdout.write('dedup_files is: {dedup}\n'.format(dedup=dedup_files))

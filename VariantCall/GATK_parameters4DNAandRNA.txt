@@ -37,7 +37,7 @@ trim	False
 
 
 phred	33
-	# encoding score for raw data.
+	# encoding  phred score for raw data. Determined based on fastqc results.
 	# other option: 64 if encoding version is less than 1.8.
 
 

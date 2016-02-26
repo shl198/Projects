@@ -3,16 +3,15 @@ this pipeline annotation variant calling results in vcf file and then
 use provean to predict the effect
 """
 import sys,subprocess,os
-from os import listdir
 sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from Modules.f11_snpEff_provean import *
 from Modules.p01_FileProcess import get_parameters
 from Modules.f00_Message import Message
 from Modules.p05_ParseGff import *
-
+from multiprocessing import Process
 parFile = sys.argv[1]
-#parFile = '/data/shangzhong/VariantCall/pgsa_VS_chok1/filteredVcfResults/Annotation_Parameters.txt'
+#parFile = '/data/shangzhong/DNArepair/Annotation/Annotation_Parameters.txt'
 param = get_parameters(parFile)
 # parameters
 thread = param['thread']
@@ -31,38 +30,56 @@ snpSift = param['snpSift']
 snpEff = param['snpEff']
 provean = param['provean']
 support_set_path = param['support_set']
+provean_res_path = param['provean_results']
 # other parameters
 gene_file = param['gene_file']
 
 Message(startMessage,email)
-
 #===============================================================================
 #        Variant analysis pipeline
 #===============================================================================
-## read gene list
-if gene_file == '':
-    genes = ['']
-else:
-    genes = []
-    geneFile = open(gene_file,'r')
-    for line in geneFile:
-        if line[0].isalpha():
-            genes.append(line[:-1])
-    geneFile.close()
-    genes = list(set(genes))
-    genes.sort()
-#================= 0. list directories =========================================
-os.chdir(pathway) # set work directory
-folders = [f for f in listdir(pathway) if os.path.isdir(os.path.join(pathway, f))]
-print 'list directories succeeds'
-print 'folders are:',folders
+def chunk(l,n):
+    n = max(1,n)
+    res = [l[i:i+n] for i in range(0,len(l),n)]
+    return res
 
-# support set for provean, it can help proven skip the time consuming blast step
-support_set = [f for f in os.listdir(support_set_path) if f.endswith('.sss')]
-for folder in folders:
-    workdir = pathway + '/' + folder
+def get_genes_from_file(gene_file):
+    """read gene list from the file and return a list of gene symbols"""
+    if gene_file == '':
+        genes = ['']
+    else:
+        genes = []
+        gene_df = pd.read_csv(gene_file,header=0,names=['GeneID'])
+        genes = gene_df['GeneID'].tolist()
+    return genes
+
+def get_all_folders(pathway):
+    """put each pair of vcf,vcf.idx files into separate folder, return folders"""
+    folders = []
+    files = [f for f in os.listdir(pathway) if f.endswith('.merged.filter.vcf')]
+    for f in files:
+        fp = f[:-18]
+        folders.append(fp)
+        if not os.path.exists(fp): os.mkdir(fp)
+        os.rename(f,fp+'/'+f)
+        os.rename(f+'.idx',fp+'/'+f+'.idx')
+    print 'list directories succeeds'
+    print 'folders are:',folders
+    return folders
+
+def prepare_fa_vari(workdir,snpEff,snpSift,email,genome,genes,record_dict,gffFile,CodonFile):
+    """
+    Prepare files for running provean, each folder should only have vcf and vcf.idx file
+    * workdir: the folder that has vcf files
+    * snpEff: path to snpEff
+    * snpSift: path to snpSift
+    * email: email or phone number (number@txt.att.net)
+    * genome: genome name defined in snpEff
+    * genes: A list of gene symbols
+    * record_dict: 
+    """
     os.chdir(workdir) # set work directory
-    vcfFiles = [f for f in listdir(workdir) if f.endswith('.vcf')]
+    vcfFiles = [f for f in os.listdir(workdir) if f.endswith('filter.vcf')]
     vcfFile = vcfFiles[0]
     proteinFiles = [];variantFiles = []
     #============= 1. Annotate vcf results using snpEff ================
@@ -102,11 +119,28 @@ for folder in folders:
             print gene,'does not have interested variants'
             raise
 
-    #============= 3. Run provean ======================================
-#     proteinFiles = [f for f in listdir(workdir) if f.endswith('protein.fa')]
-#     variantFiles = [f for f in listdir(workdir) if f.endswith('variant.txt')]
-    provean_result = 'proveanScore.txt'
-    #support_set = [f for f in os.listdir(support_set_path) if f.endswith('.sss')]
+genes = get_genes_from_file(gene_file)
+#================= 0. list directories =========================================
+os.chdir(pathway) # set work directory
+folders = get_all_folders(pathway)
+#============= 2. prepare input files for provean ======================================
+batch_folders = chunk(folders,int(thread))
+for batch in batch_folders:
+    proc = [Process(target=prepare_fa_vari,args=(pathway+'/'+f,snpEff,snpSift,email,genome,genes,record_dict,gffFile,CodonFile,)) for f in batch]
+    for p in proc:
+        p.start()
+    for p in proc:
+        p.join()
+#============= 3. Run provean ======================================    
+# # support set for provean, it can help proven skip the time consuming blast step
+support_set = [f for f in os.listdir(support_set_path) if f.endswith('.sss')]
+for folder in folders:
+    workdir = pathway+'/'+folder
+    os.chdir(workdir)
+    proteinFiles = sorted([f for f in os.listdir(workdir) if f.endswith('protein.fa')])
+    variantFiles = sorted([f for f in os.listdir(workdir) if f.endswith('variant.txt')])
+    if not os.path.exists(provean_res_path): os.mkdir(provean_res_path)
+    provean_result = provean_res_path +'/'+folder+'_proveanScore.txt'
     try:
         capture_provean_scores(provean_result,provean,proteinFiles,variantFiles,support_set_path,support_set,thread)
         print folder,'folder analysis succeeds'
@@ -114,6 +148,16 @@ for folder in folders:
         print 'capture provean scores failed'
         Message('capture provean scores failed',email)
         raise
+    #============= 4. move the sss support to the standard pathway ======================================
+    new_support_set = [f for f in os.listdir(pathway+'/'+folder) if f.endswith('.sss')]
+    for f in new_support_set:
+        os.rename(f,support_set_path+'/'+f)
+        os.rename(f+'.fasta',support_set_path+'/'+f+'.fasta')
+    for p in proteinFiles: os.remove(p)
+    for v in variantFiles: os.remove(v)
+#============= 4. Merge provean results ======================================
+outFile = pathway+'provean_final_result.txt'
+merge_provean_results(provean_res_path,outFile)
 Message(endMessage,email)
 
 

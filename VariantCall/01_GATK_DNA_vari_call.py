@@ -8,18 +8,19 @@ sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from Modules.f00_Message import Message
 from Modules.f01_list_trim_fq import list_files,Trimmomatic
-from Modules.f02_aligner_command import bwa_vari
+from Modules.f02_aligner_command import bwa_vari,bwa_Db
 from Modules.f03_samtools import sam2bam_sort
-from Modules.f07_picard import markduplicates
+from Modules.f07_picard import markduplicates,sortVCF
 from Modules.f08_GATK import *
 from Modules.p01_FileProcess import remove,get_parameters,rg_bams
+from Modules.p02_ParseFasta import divide_scaffold_by_len
 #=============  define some parameters  ===================
-"""these parameters and read group names are different for 
+"""these parameters and read group names are different for
    different samples, should only change this part for 
    running pipeline
 """
 
-#parFile = '/data/shangzhong/VariantCall/pgsaDNA_VS_chok1/DNA_Parameters.txt'
+#parFile = '/data/shangzhong/DNArepair/GATK_parameters4DNAandRNA.txt'
 parFile = sys.argv[1]
 param = get_parameters(parFile)
 thread = param['thread']
@@ -29,11 +30,12 @@ endMessage = param['endMessage']
 
 ref_fa = param['refSequence']
 file_path = param['filePath']
-bwaDb = param['alignerDb']
+bwaIndex = param['alignerDb']
 trim = param['trim']
 phred = param['phred']
 picard = param['picard']
 trimmomatic = param['trimmomatic']
+trimmoAdapter = param['trimmoAdapter']
 
 gatk = param['gatk']
 read_group = param['readGroup']
@@ -41,21 +43,27 @@ organism = param['organism']
 ##*****************  Part 0. Build index file for bwa and GATK ******
 ##=================  Part I. Preprocess  ============================
 #========  1. map and dedupping =====================================
-#========  (0) enter the directory ========================
-os.chdir(file_path)
 Message(startMessage,email)
+#========  (0) enter the directory ========================
+bwa_path = bwaIndex[:bwaIndex.rfind('/')]
+if not os.path.exists(bwa_path): os.mkdir(bwa_path)
+if os.listdir(bwa_path) == []:
+    bwa_Db(bwa_path,ref_fa)
+os.chdir(file_path)
 #========  (1) read files  ================================
-"""
 fastqFiles = list_files(file_path)
 if trim == 'True':
-    fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred)
+    trim_fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter,batch=6) 
+    remove(fastqFiles)
+else:
+    trim_fastqFiles = fastqFiles
 print 'list file succeed'
-print 'fastqFiles is: ',fastqFiles
+print 'fastqFiles is: ',trim_fastqFiles
 #========  (2) define group ===============================
 #defined above
 #========  (3) align using bwa ============================
 try:
-    map_sam = bwa_vari(read_group,fastqFiles,bwaDb,thread)
+    map_sam = bwa_vari(read_group,trim_fastqFiles,bwaIndex,thread)
     print 'align succeed'
     print 'map_sam is: ',map_sam
 except:
@@ -71,7 +79,6 @@ except:
     print 'sort bam files failed'
     Message('sort bam files failed',email)
     raise
-
 #========  (5) Markduplicates using picard ================
 try:
     dedup_files = markduplicates(picard,sort_bams)
@@ -94,7 +101,7 @@ except:
     raise
 #========  (2) realignment of target intervals ============
 try:
-    realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval)
+    realign_bams = IndelRealigner(gatk,dedup_files,ref_fa,interval,9)  # (gatk,dedupbams,reference,intervals,batch=1,*gold_indels)
     print 'IndexRealigner succeed'
     print 'realign_bams is: ',realign_bams
     remove(dedup_files)
@@ -107,7 +114,6 @@ except:
 # 1. find snp without recalibration, got vcf file
 # 2. extract the snps we think are real snps, into a real_vcf file.
 # 3. use the file in 2 to do the recalibration.
-
 ##=================  Part II. Variant Calling  ======================
 #========  1. call raw variant using HaplotypeCaller  =====
 #========  (1) determine parameters  ======================
@@ -146,60 +152,55 @@ except:
 #========  (5) Base Recalibration  ========================
 try:
     recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
-                                           gold_files[1],roundNum,thread)
+                                           gold_files[1],roundNum,thread,6)
     print 'round 1 recalibration succeed'
     print 'recal_bam_files is: ',recal_bam_files
+    remove(realign_bams)
 except:
     print 'round 1 recalibration failed'
     Message('round 1 recalibration failed',email)
     raise
-#======== second round ====================================
-roundNum = 2
-try:
-    raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,recal_bam_files,ref_fa,thread)
-    print 'round 2 call succeed'
-    print 'raw_gvcf_files is:',raw_gvcf_files
-except:
-    print 'round 2 call failed'
-    Message('round 2 call failed',email)
-    raise
-#------- Joint Genotyping --------
-try:
-    joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism,thread)
-    print 'round 2 join vcf succeed'
-    print 'joint_gvcf_file is: ',joint_gvcf_file
-    remove(raw_gvcf_files)
-except:
-    print 'round 2 join vcf failed'
-    Message('round 2 join vcf failed',email)
-    raise
-#------- Hard filter -------------
-try:
-    gold_files = HardFilter(gatk,joint_gvcf_file,ref_fa,thread)
-    print 'round 2 gold files succeed'
-    print 'gold_files is: ',gold_files
-    remove(joint_gvcf_file)
-except:
-    print 'round 2 gold files failed'
-    Message('round 2 gold files failed',email)
-    raise
-#------- Recalibration -----------
-"""
-roundNum = '2'
-gold_files = ['GlycoMutant.gold.snp.vcf', 'GlycoMutant.gold.indel.vcf']
-realign_bams = ['trim_P101_1.reali.bam','trim_P102_1.reali.bam','trim_P103_1.reali.bam',
-                'trim_P104_1.reali.bam','trim_P105_1.reali.bam','trim_P106_1.reali.bam']
-
-try:
-    recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
-                                           gold_files[1],roundNum,thread)
-    print 'round 2 recalibration succeed'
-    print 'recal_bam_files is: ',recal_bam_files
-    remove(realign_bams)
-except:
-    print 'round 2 recalibration failed'
-    Message('round 2 recalibration failed',email)
-    raise
+# #======== second round ====================================
+# roundNum = 2
+# try:
+#     raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,recal_bam_files,ref_fa,thread)
+#     print 'round 2 call succeed'
+#     print 'raw_gvcf_files is:',raw_gvcf_files
+# except:
+#     print 'round 2 call failed'
+#     Message('round 2 call failed',email)
+#     raise
+# #------- Joint Genotyping --------
+# try:
+#     joint_gvcf_file = JointGenotype(gatk,raw_gvcf_files,ref_fa,organism,thread)
+#     print 'round 2 join vcf succeed'
+#     print 'joint_gvcf_file is: ',joint_gvcf_file
+#     remove(raw_gvcf_files)
+# except:
+#     print 'round 2 join vcf failed'
+#     Message('round 2 join vcf failed',email)
+#     raise
+# #------- Hard filter -------------
+# try:
+#     gold_files = HardFilter(gatk,joint_gvcf_file,ref_fa,thread)
+#     print 'round 2 gold files succeed'
+#     print 'gold_files is: ',gold_files
+#     remove(joint_gvcf_file)
+# except:
+#     print 'round 2 gold files failed'
+#     Message('round 2 gold files failed',email)
+#     raise
+# #------- Recalibration -----------
+# try:
+#     recal_bam_files = BaseRecalibrator(gatk,realign_bams,ref_fa,gold_files[0],
+#                                            gold_files[1],roundNum,thread)
+#     print 'round 2 recalibration succeed'
+#     print 'recal_bam_files is: ',recal_bam_files
+#     remove(realign_bams)
+# except:
+#     print 'round 2 recalibration failed'
+#     Message('round 2 recalibration failed',email)
+#     raise
 #========  !!! merge lanes for the same sample ============
 if len(recal_bam_files) !=1:
     #========= merge samples  =========================
@@ -236,6 +237,8 @@ if len(recal_bam_files) !=1:
     #========  (6) call variant  ==============================
     try:
         raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
+#         raw_gvcf_files,par_L_files = par_HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,L_path)
+#         remove(par_L_files)
         print 'merged final call succeed'
         print 'raw_gvcf_files is:',raw_gvcf_files
     except:
@@ -264,7 +267,7 @@ else:
         raise
 
 #========  (8) VQSR or Hard filter  ======================================
-# since CHO samples we have don't have enough samples and snp resources, the VQSR step cannot give a very good prediction.
+# since for CHO samples we don't have enough samples and snp resources, the VQSR step cannot give a very good prediction.
 # we choose to use hardFilter.
 try:
     final_filtered_files = HardFilter(gatk,joint_gvcf_file,ref_fa,thread)
