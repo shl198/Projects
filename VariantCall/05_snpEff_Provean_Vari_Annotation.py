@@ -34,7 +34,6 @@ provean_res_path = param['provean_results']
 # other parameters
 gene_file = param['gene_file']
 
-Message(startMessage,email)
 #===============================================================================
 #        Variant analysis pipeline
 #===============================================================================
@@ -57,6 +56,7 @@ def get_all_folders(pathway):
     """put each pair of vcf,vcf.idx files into separate folder, return folders"""
     folders = []
     files = [f for f in os.listdir(pathway) if f.endswith('.merged.filter.vcf')]
+    files = natsorted(files)
     for f in files:
         fp = f[:-18]
         folders.append(fp)
@@ -119,6 +119,7 @@ def prepare_fa_vari(workdir,snpEff,snpSift,email,genome,genes,record_dict,gffFil
             print gene,'does not have interested variants'
             raise
 
+Message(startMessage,email)
 genes = get_genes_from_file(gene_file)
 #================= 0. list directories =========================================
 os.chdir(pathway) # set work directory
@@ -157,7 +158,11 @@ for folder in folders:
     for v in variantFiles: os.remove(v)
 #============= 4. Merge provean results ======================================
 outFile = pathway+'provean_final_result.txt'
-merge_provean_results(provean_res_path,outFile)
+try:
+    merge_provean_results(provean_res_path,outFile)
+    print 'merge succeed'
+except:
+    print 'merge failed'
 Message(endMessage,email)
 
 

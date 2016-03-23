@@ -120,7 +120,7 @@ except:
 #========  (2) call variant  ==============================
 roundNum = 1
 try:
-    raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
+    raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread,batch=int(thread))
     print 'round 1 call succeed'
     print 'raw_gvcf_files is: ',raw_gvcf_files
 except:
@@ -236,7 +236,7 @@ if len(recal_bam_files) !=1:
         raise
     #========  (6) call variant  ==============================
     try:
-        raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread)
+        raw_gvcf_files = HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,thread,batch=int(thread))
 #         raw_gvcf_files,par_L_files = par_HaplotypeCaller_DNA_gVCF(gatk,realign_bams,ref_fa,L_path)
 #         remove(par_L_files)
         print 'merged final call succeed'
@@ -265,7 +265,6 @@ else:
         print 'final call failed'
         Message('final call failed',email)
         raise
-
 #========  (8) VQSR or Hard filter  ======================================
 # since for CHO samples we don't have enough samples and snp resources, the VQSR step cannot give a very good prediction.
 # we choose to use hardFilter.
