@@ -6,9 +6,9 @@ import pandas as pd
 from natsort import natsorted
 import numpy as np
 import scipy.stats as sp_stats
-# import matplotlib
+import matplotlib
 # matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from f02_RiboDataModule import *
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.style.use('ggplot')
 import matplotlib.gridspec as gridspec
+import seaborn as sns
 
 bam_path = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam'
 db_path = '/data/shangzhong/RibosomeProfiling/Database'
@@ -31,7 +32,9 @@ gene_count_path = bam_path + '/04_gene_total_count'  # part 8
 rna_gene_count_path = rna_bam_path + '/01_gene_count'
 rna_cov_path = rna_bam_path + '/02_cov'
 stall_site_path = bam_path + '/05_stall_sites'
+pr_nt_cov_path = bam_path + '/08_pr_ntpos_cov'
 frame_cov_path = bam_path + '/09_frame_cov'
+window_cov_path = bam_path + '/10_window_cov'
 
 exnFile = db_path +'/01_pr_rna.txt'  # part 8,
 cdsFile = db_path + '/01_pr_cds.txt' # part 8,
@@ -783,82 +786,82 @@ def sub_region_plot(cdsFile,exnFile,totalCount,covFiles,cds_pos,utr_pos,covType,
 # #                         12. count fraction for different frame to show coverage periodicity (only consider Eef1a1, heavychain,lightchain,NeoR)
 # #===============================================================================
 #------------------- 1. get read coverage information file ------------------
-os.chdir(fwd_rev_path)
-covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
-covFiles = natsorted(covFiles)
-outpath = signalP_path + '/01_tr_ribo_pos_cov'
-outFile1 = signalP_path + '/13_cds_frame_fraction.csv'
-outFile2 = signalP_path + '/13_utr5_frame_fraction.csv'
-outFile3 = signalP_path + '/13_utr3_frame_fraction.csv'
- 
-genes = ['100689276','heavychain','lightchain','NeoRKanR']
-#------------------- 2. get coverage percentage for each frame in coding region ------------------
-# get the position coverage for each transcript
-# for f in covFiles:
-#     gene_tr_cov(exnFile,cdsFile,all_id_file,f,outpath,genes,'yes',ribo_offset_file)
-# get cds positions, whole transcript positions
-cds_df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)
-cds_obj = trpr(cds_df)
-exn_df = pd.read_csv(exnFile,sep='\t',header=0,low_memory=False)
-exn_obj = trpr(exn_df)
-# get frame coverage
-os.chdir(outpath)
-pr_pos_cov_files = [f for f in os.listdir(outpath) if f.endswith('trpos.txt')]
-pr_pos_cov_files = natsorted(pr_pos_cov_files)
-# 1) cds frame calculation
-frame_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
-utr5_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
-utr3_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
-for f in pr_pos_cov_files:
-    handle = open(f,'r')
-    # loop for genes
-    for line in handle:
-        item = line[:-1].split('\t')
-        geneid = item[0]
-        trid = item[1]
-        prid = item[2]
-        # get distance between tr and pr
-        tr_pos = exn_obj.get_trpr_pos(trid)
-        pr_pos = cds_obj.get_trpr_pos(prid)
-        s_index = tr_pos.index(pr_pos[0])
-        e_index = tr_pos.index(pr_pos[-1])
-           
-        cov = item[3:]
-        # 1) cds coverage calculation
-        cds_cov = cov[s_index:e_index+1]
-        sum_count = sum([int(p) for p in cds_cov])
-        # loop for each position
-        frames = frame_count(cds_cov)
-        frame_df.loc[geneid+'_'+f[:3]]=frames
-        # 2) 5' UTR frame
-        utr5_cov = cov[:s_index]
-        if len(utr5_cov) == 1:
-            utr5_cov = utr5_cov[1:]
-        elif len(utr5_cov) == 2:
-            utr5_cov = utr5_cov[2:]
-        sum5_count = sum([int(p) for p in utr5_cov])
-        frames = frame_count(utr5_cov)
-        if sum5_count == 0:
-            print geneid,'dones not have 5 utr'
-            utr5_df.loc[geneid+'_'+f[:3]] = [0] * 3
-        else:
-            utr5_df.loc[geneid+'_'+f[:3]]=[frame/float(sum5_count) for frame in frames]
-        # 3) 3' UTR frame
-        utr3_cov = cov[e_index+1:]
-        if len(utr3_cov) == 1:
-            utr3_cov = utr3_cov[:-1]
-        elif len(utr3_cov) == 2:
-            utr3_cov = utr3_cov[:-2]
-        sum3_count = sum([int(p) for p in utr3_cov])
-        frames = frame_count(utr3_cov)
-        if sum3_count == 0:
-            print geneid,'does not have 3 utr'
-            utr3_df.loc[geneid+'_'+f[:3]] = [0] * 3
-        else:
-            utr3_df.loc[geneid+'_'+f[:3]]=[frame/float(sum3_count) for frame in frames]
-   
-frame_df = frame_df.sort_index()
-print frame_df
+# os.chdir(fwd_rev_path)
+# covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
+# covFiles = natsorted(covFiles)
+# outpath = signalP_path + '/01_tr_ribo_pos_cov'
+# outFile1 = signalP_path + '/13_cds_frame_fraction.csv'
+# outFile2 = signalP_path + '/13_utr5_frame_fraction.csv'
+# outFile3 = signalP_path + '/13_utr3_frame_fraction.csv'
+#  
+# genes = ['100689276','heavychain','lightchain','NeoRKanR']
+# #------------------- 2. get coverage percentage for each frame in coding region ------------------
+# # get the position coverage for each transcript
+# # for f in covFiles:
+# #     gene_tr_cov(exnFile,cdsFile,all_id_file,f,outpath,genes,'yes',ribo_offset_file)
+# # get cds positions, whole transcript positions
+# cds_df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)
+# cds_obj = trpr(cds_df)
+# exn_df = pd.read_csv(exnFile,sep='\t',header=0,low_memory=False)
+# exn_obj = trpr(exn_df)
+# # get frame coverage
+# os.chdir(outpath)
+# pr_pos_cov_files = [f for f in os.listdir(outpath) if f.endswith('trpos.txt')]
+# pr_pos_cov_files = natsorted(pr_pos_cov_files)
+# # 1) cds frame calculation
+# frame_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+# utr5_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+# utr3_df = pd.DataFrame(columns=['frame1','frame2','frame3'])
+# for f in pr_pos_cov_files:
+#     handle = open(f,'r')
+#     # loop for genes
+#     for line in handle:
+#         item = line[:-1].split('\t')
+#         geneid = item[0]
+#         trid = item[1]
+#         prid = item[2]
+#         # get distance between tr and pr
+#         tr_pos = exn_obj.get_trpr_pos(trid)
+#         pr_pos = cds_obj.get_trpr_pos(prid)
+#         s_index = tr_pos.index(pr_pos[0])
+#         e_index = tr_pos.index(pr_pos[-1])
+#            
+#         cov = item[3:]
+#         # 1) cds coverage calculation
+#         cds_cov = cov[s_index:e_index+1]
+#         sum_count = sum([int(p) for p in cds_cov])
+#         # loop for each position
+#         frames = frame_count(cds_cov)
+#         frame_df.loc[geneid+'_'+f[:3]]=frames
+#         # 2) 5' UTR frame
+#         utr5_cov = cov[:s_index]
+#         if len(utr5_cov) == 1:
+#             utr5_cov = utr5_cov[1:]
+#         elif len(utr5_cov) == 2:
+#             utr5_cov = utr5_cov[2:]
+#         sum5_count = sum([int(p) for p in utr5_cov])
+#         frames = frame_count(utr5_cov)
+#         if sum5_count == 0:
+#             print geneid,'dones not have 5 utr'
+#             utr5_df.loc[geneid+'_'+f[:3]] = [0] * 3
+#         else:
+#             utr5_df.loc[geneid+'_'+f[:3]]=[frame/float(sum5_count) for frame in frames]
+#         # 3) 3' UTR frame
+#         utr3_cov = cov[e_index+1:]
+#         if len(utr3_cov) == 1:
+#             utr3_cov = utr3_cov[:-1]
+#         elif len(utr3_cov) == 2:
+#             utr3_cov = utr3_cov[:-2]
+#         sum3_count = sum([int(p) for p in utr3_cov])
+#         frames = frame_count(utr3_cov)
+#         if sum3_count == 0:
+#             print geneid,'does not have 3 utr'
+#             utr3_df.loc[geneid+'_'+f[:3]] = [0] * 3
+#         else:
+#             utr3_df.loc[geneid+'_'+f[:3]]=[frame/float(sum3_count) for frame in frames]
+#    
+# frame_df = frame_df.sort_index()
+# print frame_df
 # frame_df.to_csv(outFile1,sep='\t')
 # 
 # utr5_df = utr5_df.sort_index()
@@ -1250,35 +1253,266 @@ def trans_effi_plot(gene_count_path,rna_gene_count_path,bam_path,covType):
 # merge_df = pd.concat(dfs,axis=1)
 # merge_df.to_csv(signalP_path + '/15_recom_genes_stall_sties.csv',sep='\t')
 # print merge_df
-
 # #===============================================================================
 # #                         16. plot frame coverage
 # #===============================================================================
 # os.chdir(frame_cov_path)
 # frame_files = [f for f in os.listdir(frame_cov_path) if f.endswith('frame.txt')]
 # frame_files = natsorted(frame_files)
+# row = 2; col = 1
+# fig,axes = plt.subplots(row,col,sharex=True,figsize=(6,10))
+# # day3
 # frame_df = []
-# row = 2; col = 3
-# fig,axes = plt.subplots(row,col,sharex=True,figsize=(14.5,8))
-# names = []
-# for f in frame_files:
-#     df = pd.read_csv(f,sep='\t',header=0,index_col=0)
+# for f in frame_files[0:3]:
+#     df = pd.read_csv(f,sep='\t',header=0)
 #     frame_df.append(df)
-#     names.append(f[:3])
-# for i in range(row):
-#     for j in range(col):
-#         df = frame_df[i*col+j]
-#         df.plot(kind='box',ax=axes[i,j],title=names[i*col+j])
-#         cri = df.index.map(lambda x: x in ['NeoRKanR','heavychain','lightchain'])
-#         recom_df = df[cri]
-#         columns = recom_df.columns
-#         num = len(columns)
-#         for n in range(num):
-#             p1,p2,p3 = axes[i,j].plot([n+1.1],recom_df.iloc[0,n],'r.',[n+1.05],recom_df.iloc[1,n],'g.',[n+0.95],recom_df.iloc[2,n],'b.')
-# fig.legend((p1,p2,p3),('NeoR','heavy','light'),'upper left')
+# merge_df = pd.concat(frame_df)
+# day3_frame_df = merge_df.groupby(['geneid']).mean()
+# # day6
+# frame_df = []
+# for f in frame_files[3:6]:
+#     df = pd.read_csv(f,sep='\t',header=0)
+#     frame_df.append(df)
+# merge_df = pd.concat(frame_df)
+# day6_frame_df = merge_df.groupby('geneid').mean()
+# # plot
+# for df,d,c in zip([day3_frame_df,day6_frame_df],['day3','day6'],range(row)):
+#     sns.boxplot(data=df,ax=axes[c],width=0.2)
+#     axes[c].set_title(d)
+#     #df.plot(kind='box',ax=axes[c],title=d,widths=0.2)
+#     axes[c].set_ylabel('fraction')
+#     cri = df.index.map(lambda x: x in ['heavychain','lightchain'])
+#     recom_df = df[cri]
+#     columns = recom_df.columns
+#     num = len(columns)
+#     for n in range(num):
+#         p1,p2 = axes[c].plot([n+0.02],recom_df.iloc[0,n],'go',[n-0.02],recom_df.iloc[1,n],'ro')
+# fig.legend((p1,p2),('heavy','light'),'upper left')
 # outFile = fig_path + '/17_frame_cov'
 # plt.savefig(outFile+'.svg')
 # plt.savefig(outFile+'.pdf')
+# plt.show()
+#===============================================================================
+#                         17. plot coverage around tss and tse
+#===============================================================================
+def get_median_dict(pr_nt_cov_file):
+    """Build {pr:median_covrage} dictionary and turn it into a dataframe"""
+    pr_median = {}
+    handle = open(pr_nt_cov_file,'r')
+    for line in handle:
+        item = line[:-1].split('\t')
+        cov = [int(p) for p in item[2:]]
+        try:
+            codon_cov = chunk(cov[45:-30],3)
+            m_cov = map(sum,codon_cov)#[sum(p) for p in codon_cov]
+            codon_med = np.median(np.array(m_cov))/3.0
+            pr_median[item[0]]=codon_med  # item[0] is gene
+#             data = np.array(cov[45:-30])
+#             med = np.mean(data)
+#             pr_median[item[0]]=med  # item[0] is gene
+        except:
+            continue
+    df = pd.DataFrame.from_dict(pr_median,orient='index')
+    df.columns = ['median']
+    df = df[df['median'].values > 0]
+    return df  # one column: median or mean
+
+def meta_norm_cov(pr_nt_cov_files,window_cov_files,up,down):
+    """Normalize each position in a window by median coverage of that gene"""
+    res_df = []
+    for f1,f2 in zip(pr_nt_cov_files,window_cov_files):
+        # 1. get window coverage
+        win_df = pd.read_csv(f2,sep='\t',header=0,index_col=0,low_memory=False,names=['GeneID','Pr']+range(-up,down+1))
+        del win_df['Pr']
+        # 2. get pr median df
+        pr_med_df = get_median_dict(f1)
+        win_df = win_df[win_df.index.isin(pr_med_df.index)]
+        # 3. divide each row of win_df by pr_med_df
+        norm_df = win_df.div(pr_med_df['median'],axis='index')
+        res_df.append(norm_df)
+    return res_df   # a list of dfs
+
+def merge_meta(norm_dfs,genes=[],covType='median'):
+    """wrap meta_norm_cov for many files and merge the results
+    * norm_dfs: a list of normalized window coverage for each file
+    * genes: genes taken into consider to get the median
+    * covType: if set to an sepcific gene, then it only gets norm coverage for that gene.
+    """
+    median_df = []
+    for norm_df in norm_dfs:
+        if genes != []:
+            norm_df = norm_df[norm_df.index.isin(genes)]
+        median_df.append(norm_df)
+    med_df = pd.concat(median_df)
+    med_df = med_df.groupby(med_df.index).mean()
+    if covType == 'median':
+        return med_df.median()
+    elif covType == 'all':
+        return med_df
+    else:
+        return med_df.loc[covType]
+
+def plot_meta_median(covFiles,windowFiles,up,down,genes=[],covType='median',center='tss'):
+    tss_norm_dfs = meta_norm_cov(covFiles,windowFiles,up,down)  # a list of data frames
+    for tss in tss_norm_dfs:
+        print tss.shape
+    df = pd.DataFrame()  # store final results
+    if covType == 'median':
+        df3 = merge_meta(tss_norm_dfs[0:3],genes,covType='median')
+        df6 = merge_meta(tss_norm_dfs[3:6],genes,covType='median')
+        df['day3']=df3
+        df['day6']=df6
+        ax=df.plot(title='day 3 meta coverage around '+center)
+        ax.set_ylabel('density')
+        plt.savefig(fig_path + '/18_all_gene_cov_around_' + center + '.svg')
+    elif covType =='all':
+        # 1. get the dataframe for day3 and day6
+        df3 = merge_meta(tss_norm_dfs[0:3],genes,covType='all')
+        print df3.shape
+#         df3_endo = df3.drop(['heavychain','lightchain','NeoRKanR'])
+#         print df3_endo.shape
+        df6 = merge_meta(tss_norm_dfs[3:6],genes,covType='all')
+        print df6.shape
+#         df6_endo = df6.drop(['heavychain','lightchain','NeoRKanR'])
+#         print df6_endo.shape
+#         df3 = (df3 + 0.001).apply(np.log2);df6 = (df6 + 0.001).apply(np.log2)
+        up = down = 50
+        # 2. begin to plot
+        # plot for day 3
+        f = plt.figure()
+        gs = gridspec.GridSpec(2,1,height_ratios=[1,3])
+        ax0 = f.add_subplot(gs[0]);ax1 = f.add_subplot(gs[1]);
+        f.set_size_inches(16,8)
+        # change the index to make df position start with 0.
+        re_df = df3[range(-up,down+1)].loc[['heavychain','lightchain']].T.copy()
+        re_df.index = range(up+down+1)
+        
+#         sns.set_palette("bright")
+        re_df.plot(ax=ax0,color=['r','b'],alpha=0.7)
+        re_df.plot(ax=ax1,color=['r','b'],alpha=0.7)
+        re_df = df3[range(-up,down+1)].copy()
+        re_df.columns = range(up+down+1)
+        sns.boxplot(re_df,color='lightblue',ax=ax0)
+        sns.boxplot(re_df,color='lightblue',ax=ax1)
+        labels = [str(i) for i in range(-up,down+1)]
+        ax1.set_xticklabels(labels)
+        ax0.set_title('coverage around ' + center + ' at day3')
+        ax1.set_ylabel('density')
+        ax0.set_ylim(400,3000);ax1.set_ylim(0,150)
+        plt.savefig(fig_path + '/18_all_gene_cov_day3_around_' + center + '.svg')
+        # plot by day 6
+        f = plt.figure()
+        gs = gridspec.GridSpec(2,1,height_ratios=[1,3])
+        ax0 = f.add_subplot(gs[0]);ax1 = f.add_subplot(gs[1]);
+        f.set_size_inches(16,10)
+        re_df = df6[range(-up,down+1)].loc[['heavychain','lightchain']].T.copy()
+        
+        re_df.index = range(up+down+1)
+        re_df.plot(ax=ax0,color=['r','b'],alpha=0.7)
+        re_df.plot(ax=ax1,color=['r','b'],alpha=0.7)
+        re_df = df6[range(-up,down+1)].copy()
+        re_df.columns = range(up+down+1)
+        sns.boxplot(re_df,color='lightblue',ax=ax0)
+        sns.boxplot(re_df,color='lightblue',ax=ax1)
+        labels = [str(i) for i in range(-up,down+1)]
+        ax1.set_xticklabels(labels)
+        ax0.set_title('coverage around ' + center + ' at day6')
+        ax1.set_ylabel('density')
+        ax0.set_ylim(200,1600);ax1.set_ylim(0,150)
+        plt.savefig(fig_path + '/18_all_gene_cov_day6_around_' + center + '.svg')
+    else:
+        for g in covType:
+            df3 = merge_meta(tss_norm_dfs[0:3],genes,g)
+            df6 = merge_meta(tss_norm_dfs[3:6],genes,g)
+            df['day3']=df3
+            df['day6']=df6
+            ax=df.plot(title= g + ' coverage around '+center)
+            ax.set_ylabel('density')
+            plt.savefig(fig_path + '/18_' + g + ' around_' + center + '.svg')
+
+# # 1. get pr nt coverage file
+# covFiles = [os.path.join(pr_nt_cov_path,f) for f in os.listdir(pr_nt_cov_path) if f.endswith('.txt')]
+# covFiles = natsorted(covFiles)
+# # 2. window file
+# window_cov_path = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/10_window_cov'
+# tss_path = window_cov_path+'/tss'; tse_path = window_cov_path+'/tse'
+# tssFiles = [os.path.join(tss_path,f) for f in os.listdir(tss_path) if f.endswith('.txt')]
+# tssFiles = natsorted(tssFiles)
+# tseFiles = [os.path.join(tse_path,f) for f in os.listdir(tse_path) if f.endswith('.txt')]
+# tseFiles = natsorted(tseFiles)
+# # 3. get the sort of gene abundance
+# gene_count_file = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/04_gene_total_count/s04_cov_geneCount.txt'
+# gene_count_df = pd.read_csv(gene_count_file,sep='\t',header=0)
+# gene_count_df = gene_count_df.sort(['count'])
+# genes = gene_count_df['GeneID'].tolist()
+# # genes = (gene_count_df[gene_count_df['count'].values>=128])['GeneID'].tolist()
+# # 3. normalize the window cov
+# up=100; down=50
+# plot_genes = ['heavychain','lightchain','NeoRKanR']
+# plot_meta_median(covFiles,tssFiles,up,down,genes,'all',center='tss')
+# # plot_meta_median(covFiles,tssFiles,up,down,genes,plot_genes,center='tss')
+# plot_meta_median(covFiles,tseFiles,up,down,genes,'all',center='tse')
+# # plot_meta_median(covFiles,tseFiles,up,down,genes,plot_genes,center='tse')
+# plt.show()
+
+#===============================================================================
+#                         18. pause site frequency histogram
+#===============================================================================
+def get_stall_df(stallFiles,column):
+    dfs = []
+    for f in stallFiles[0:3]:
+        df = pd.read_csv(f,sep='\t',header=0,usecols=[1,4])
+        print df.shape
+        dfs.append(df)
+    stall_df = pd.concat(dfs)
+    stall_df = stall_df.drop_duplicates()
+    g_stall_df = stall_df.groupby(by=['GeneID']).aggregate('count')
+    g_stall_df.columns = [column]
+    return g_stall_df
+def get_genes_with_median_over0(covFiles):
+    """Get genes whose meidan coverage is greater than 0"""
+    gene_set=[]
+    for f in covFiles:
+        df = get_median_dict(f)
+        gene_set.extend(df.index.tolist())
+    g_set = list(set(gene_set))
+#     g_set = list(set.intersection(*map(set,gene_set)))
+    return g_set
+# # 0. get pr nt coverage file
+# covFiles = [os.path.join(pr_nt_cov_path,f) for f in os.listdir(pr_nt_cov_path) if f.endswith('.txt')]
+# covFiles = natsorted(covFiles)
+# day3_genes = get_genes_with_median_over0(covFiles[0:3])
+# day6_genes = get_genes_with_median_over0(covFiles[3:6])
+# gene_set = list(set(day3_genes+day6_genes))
+# # 1. get genes length
+# gene_count_file = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/04_gene_total_count/s04_cov_geneCount.txt'
+# gene_count_df = pd.read_csv(gene_count_file,sep='\t',header=0,usecols=[0,2],index_col=0)
+# # 2. build {gene:# of pause sites}
+# os.chdir(stall_site_path)
+# stallFiles = [f for f in os.listdir(stall_site_path) if f.endswith('txt')]
+# stallFiles = natsorted(stallFiles)
+# g3_stall_df = get_stall_df(stallFiles[0:3],'day3')
+# g6_stall_df = get_stall_df(stallFiles[3:6],'day6')
+# g_stall_df = pd.concat([g3_stall_df,g6_stall_df],axis=1,join='outer')  # gene,day3_stall#,day6_stall#
+# # 3. normalize pause site
+# norm_stall_df = g_stall_df.div(gene_count_df['length'],axis='index')*1000
+# norm_stall_df = norm_stall_df[norm_stall_df.index.isin(gene_set)]
+# norm_stall_df.fillna(0,inplace=True)
+# ax = norm_stall_df.plot(kind='hist',bins=50,alpha=0.5,title='number of stallsites per k base')
+# recom = ['heavychain','lightchain','NeoRKanR']
+# recom_df = norm_stall_df.loc[recom]
+# # day3 recombinant plot
+# day3_recom = recom_df['day3'].tolist()
+# color = ['r','g','b']
+# for n,c,r in zip(day3_recom,color,recom):
+#     ax.axvline(n,color=c,linestyle='-',label='day3_'+r)
+# # day6 recombinant plot
+# day6_recom = recom_df['day6'].tolist()
+# for n,c,r in zip(day6_recom,color,recom):
+#     ax.axvline(n,color=c,linestyle='--',label='day6_'+r)
+# lines, labels = ax.get_legend_handles_labels()
+# ax.legend(lines,labels)
+# plt.savefig(fig_path+'/19_stall_frequency.svg')
 # # plt.show()
 
 
@@ -1406,15 +1640,6 @@ plt.xlabel('Distance to the Tanslation start site')
 plt.savefig('/data/shangzhong/RibosomeProfiling/figures/14_codon_cov_all.svg')
 plt.show()
 """
-
-
-
-
-
-
-
-
-
 
 
 #===============================================================================

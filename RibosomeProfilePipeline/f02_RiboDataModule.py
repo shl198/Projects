@@ -874,8 +874,28 @@ class trpr(object):
             return lens[max(lens.keys())]
         else:
             return trprs[0]
-        
-    def get_trpr_pos(self,trpr,up=0,down=0,level='trpr'):
+    
+    
+    def get_gene_trpr_len(self,gene,multi_chrom='N'):
+        """
+        This function gets the lenth of all exon/CDS in a gene.
+        * gene: str. gene id
+        * multi_chrom: N or Y. Whether to include the length of multiple chromosome
+        """
+        trpr_df = self.df[self.df['geneid'].values==gene]
+        chrom = list(set(trpr_df['chr'].tolist()))
+        if multi_chrom == 'N':
+            if len(chrom) > 1:
+                assert False,'gene map to multiple chromosome'
+        # get total length
+        pos = []
+        for start,end in zip(trpr_df['start'],trpr_df['end']):
+            inter = range(int(start)+1,int(end)+1)
+            pos = inter+pos
+        return len(list(set(pos)))
+            
+    
+    def get_trpr_pos(self,trpr,level='trpr'):
         """
         This function gets all position of transcript or protein or gene
         """
@@ -901,23 +921,29 @@ class trpr(object):
             else:
                 pos.extend(inter)
         if pos[0]>pos[1]: # - strand
-            pos = natsorted(list(set(pos)))[::-1]
-            new_pos = range(pos[0]+up,pos[0],-1) + pos + range(pos[-1]-1,pos[-1]-down,-1)
+            new_pos = natsorted(list(set(pos)))[::-1]
         else:
-            pos = natsorted(list(set(pos)))
-            new_pos = range(pos[0]-up,pos[0]) + pos + range(pos[-1]+1,pos[-1]+down)
+            new_pos = natsorted(list(set(pos)))
         return new_pos
     
-    def get_ribo_trpr_pos(self,trpr,offset,level='trpr'):
+    def get_ribo_pr_pos(self,trpr,rna_pos,offset,level='trpr'):
         """get position of A site for ribosome profiling.
-        includes the offset of the distance between 5' end and the A site. 
+        includes the offset of the distance between 5' end and the A site.
+        * trpr: pr accession
+        * rna_pos: a list of rna positions
+        * offset: offset between 5' end and start of A site in ribosome 
         """
         pos = self.get_trpr_pos(trpr,level=level)
-        off = offset + 1
-        if pos[0]>pos[1]: # - strand
-            new_pos = range(pos[0]+off,pos[0],-1) + pos[:-off]
-        else:
-            new_pos = range(pos[0]-off,pos[0]) + pos[:-off]
+        off = offset
+        index = rna_pos.index(pos[0]) # index of pr start pos in rna positions
+        if index >= off:
+                new_pos = rna_pos[index-off:index] + pos[:-off]
+        else:  # index < offset
+            if pos[0]>pos[1]: # - strand
+                step = -1
+            elif pos[0]<pos[1]:
+                step = 1
+            new_pos = range(rna_pos[0]-step*(off-index),rna_pos[0],step) + rna_pos[:index]+pos[:-off]
         return new_pos
     
     def htseq_genome_array_set(self,stranded=False):
@@ -1086,30 +1112,34 @@ def read_2_multi_genes(gene_array,chrom,start,end):
         return True
 
 
-def posCoverage(gene_df,cov_df,pos,gene_array_set):
+def posCoverage(gene_df,chr_df,pos,gene_array_set,ss=False):
     """
     This function calculates the coverage at each position of gene
     
     * gene_df: pd dataframe. with 6 columns # 'chr','start','end','geneid','praccess','strand'. Here it is used to get chromosoem.
-    * cov_df: pd dataframe. with 6 columns # 'num','chr','end5','end3','strand','len'. end5 and end 3 are alignment end, not read end.
+    * chr_df: pd dataframe for only one chromosome. with 6 columns. # 'num','chr','end5','end3','strand','len'. end5 and end 3 are alignment end, not read end.
     * pos: list. List of position.
     * gene_array_set: htseq genearray set. Used for removing reads mapping to multiple genes.
+    * strand: '+' or '-'. If not set, then the read is not strand specific.
     """
-    gene = list(set(gene_df['geneid'].tolist()))
-    g_obj = trpr(gene_df) 
-    chrom = g_obj.get_chrom(gene[0])  # chromosome
-    gCov_df = cov_df[cov_df['chr'].values==chrom]  # coverage dataframe of the chromosome
-    if gCov_df.empty:
+    chrom = list(set(gene_df['chr'].tolist()))[0]  # chromosome
+    if chr_df.empty:
         return [0]*len(pos)
-    max_len = max(gCov_df['len'].tolist())
+    max_len = max(chr_df['len'].tolist())
     if pos[0]>pos[1]:  # - strand
-        large = pos[0] + max_len
-        small = pos[-1] - max_len
+        if ss == True:
+            gCov_df = chr_df[chr_df['strand'].values=='-']
+        else:
+            gCov_df = chr_df
+        large = pos[0] + max_len   # this is to make sure including the reads whose one end in cds, another end outside of cds 
         new_pos = range(large,pos[0],-1) + pos
         gCov_df = gCov_df[(gCov_df['end3'].isin(new_pos))]
     else:
+        if ss == True:
+            gCov_df = chr_df[chr_df['strand'].values=='+']
+        else:
+            gCov_df = chr_df
         small = pos[0] - max_len
-        large = pos[-1] + max_len
         new_pos = range(small,pos[0]) + pos
         gCov_df = gCov_df[(gCov_df['end5'].isin(new_pos))]
     if gCov_df.empty:
@@ -1121,56 +1151,148 @@ def posCoverage(gene_df,cov_df,pos,gene_array_set):
     return cov_pos      
 
 
-def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[],pr_cov_level='codon'):
+def get_window_pos(pr_pos,tr_pos,up,down,center='tss'):
+    """gets the window position upstream or downstream of TSS and TSE of a protein
+    * pr_pos: list of protein position
+    * tr_pos: list of rna position
+    * up,down: int. positions up, down stream of the center point
+    * center: 'tss' or 'tse'. Window center at tss or tse
     """
-    This function gets all protein position coverage in a coverfile, longest protein for a gene is chosen
+    if pr_pos[0]>pr_pos[1]:
+        step = -1
+    else:
+        step = 1
+    tss_index = tr_pos.index(pr_pos[0]) # index of pr start pos in rna positions
+    tse_index = tr_pos.index(pr_pos[-1])
+    if center == 'tss':
+        # pos up stream of the tss
+        if tss_index >= up:
+            up_pos = tr_pos[tss_index-up:tss_index]
+        else:
+            up_pos = range(tr_pos[0]-step*(up-tss_index),tr_pos[0],step) + tr_pos[:tss_index]
+        # pos down stream of the tse
+        pr_3utr = len(tr_pos)-tss_index -1  # number of nts after tss
+        if (pr_3utr)>=down:
+            down_pos = tr_pos[tss_index:tss_index + down + 1]
+        else:
+            down_pos = tr_pos[tss_index:] + range(tr_pos[-1]+step,tr_pos[-1]+step*(down-pr_3utr)+step,step)
+    elif center == 'tse':
+        # pos up stream of the tse
+        if tse_index >= up:
+            up_pos = tr_pos[tse_index-up:tse_index]
+        else:
+            up_pos = range(tr_pos[0]-step*(up-tse_index),tr_pos[0],step) + tr_pos[:tse_index]
+        # pos down stream of the tse
+        utr3_len = len(tr_pos)-tse_index -1
+        if utr3_len >= down:
+            down_pos = tr_pos[tse_index:tse_index + down + 1]
+        else:
+            down_pos = tr_pos[tse_index:] + range(tr_pos[-1]+step,tr_pos[-1]+step*(down-utr3_len)+step,step)
+    pos = up_pos + down_pos
+    return pos
+
+def all_pos4gene_total_cov(prs,gene_cds_df,g_cds_obj,exn_df,chr_df,pr_rna_dict,off_len_dic,gene_array_set,strand):
+    """This function finds all the positions of either cds or exons in a gene. It's used by function gene_pr_cov
+    all parameters are same as in function gene_pr_cov
+    """
+    gene_cov_df = pd.DataFrame()
+    if strand == '+':
+        rever=False
+    elif strand == '-':
+        rever=True
+        
+    for offset in natsorted(off_len_dic):  # alignment length
+        off_cov_df = chr_df[chr_df['len'].isin(off_len_dic[offset])]
+        off = offset + 1
+        all_cds_pos = []
+        for pr in prs:
+            # get mRNA position
+            rna = pr_rna_dict[pr]
+            g_exn_df = exn_df[exn_df['access'].values==rna]
+            g_exn_obj = trpr(g_exn_df)
+            rna_pos = g_exn_obj.get_trpr_pos(rna) # mRNA position
+            pos = g_cds_obj.get_ribo_pr_pos(pr, rna_pos, offset)
+            all_cds_pos.extend(pos)
+        new_pos = sorted(list(set(all_cds_pos)),reverse=rever)
+        cov_pos = posCoverage(gene_cds_df,off_cov_df,new_pos,gene_array_set,True)
+        gene_cov_df[str(off)] = pd.Series(cov_pos)
+    gene_cov = gene_cov_df.sum(axis=1).tolist()
+    total = sum(gene_cov)
+    return total,new_pos
+        
     
-    * covFile: str. Filename with 6 columns.
-    * cdsFile: str. Filename with 6 columns.
-    * ribo_offset_file: str. Filename with 2 columns: length,offset
-    * covType: str. get coverage at position level or at the gene level.
-    * genes: list. If setted it will only get coverage for the genes provided, if not it will calculate all genes.
-    If covType is pos: each line of output would be "geneid    protein access    coverage at each position"
-    If covType is gene: each line of output would be "geneid    total count    length of total CDS positions"
+def wrap4gene_pr_cov_func(covFile,cdsFile,exnFile,allIDFile,ribo_offset_file):
+    """This function wraps some common steps of function gene_pr_cov,gene_tr_cov,gene_window_cov
     """
-    if not os.path.exists(outpath): os.mkdir(outpath)
     # 1) read coverage files
     cov_df = pd.read_csv(covFile,sep='\t',header=None,names=['num','chr','end5','end3','strand','len'],low_memory=False)
     # 2) read protein position file
     cds_df = pd.read_csv(cdsFile,sep='\t',header=0,low_memory=False)   # Chr    cds_start    cds_end    GeneID    Pr_Access    Strand
-    trpr_obj = trpr(cds_df)
-    # 3). create array set by htseq. This is for retriving positions that are covered by many genes
-    gene_array_set = trpr_obj.htseq_genome_array_set(False)
-    # 4) get the offset length
+    cds_obj = trpr(cds_df)
+    # 3) read mRNA position file
+    exn_df = pd.read_csv(exnFile,sep='\t',header=0,low_memory=False)   # Chr    cds_start    cds_end    GeneID    Pr_Access    Strand
+    exn_obj = trpr(exn_df)
+    # 4) read all id file and build protein:rna dictionary
+    id_df = pd.read_csv(allIDFile,sep='\t',header=0,low_memory=False)
+    pr_rna_dict = id_df.set_index('PrAccess')['TrAccess'].to_dict()
+    # 5). create array set by htseq. This is for retriving positions that are covered by many genes
+    gene_array_set = exn_obj.htseq_genome_array_set(False)
+    # 6) get the offset length
     ribo_offset_df = pd.read_csv(ribo_offset_file,sep='\t',header=0,names=['len','off'],low_memory=False)
     off_len_dic = {k:list(v) for k,v in ribo_offset_df.groupby('off')['len']}
-    # 5) get all genes
+    return cov_df,cds_df,cds_obj,exn_df,pr_rna_dict,gene_array_set,off_len_dic
+
+
+def gene_pr_cov(covFile,cdsFile,exnFile,allIDFile,ribo_offset_file,outpath,covType='pos',genes=[],pr_cov_level='codon'):
+    """
+    This function gets all protein position coverage in a coverfile, longest protein for a gene is chosen
+    
+    * covFile: str. Filename with 6 columns. 
+    * cdsFile: str. Filename with 6 columns.
+    * exnFile: str. Filename with 6 columns.
+    * allIDFile: str. Filename with all type of id from gff file.
+    * ribo_offset_file: str. Filename with 2 columns: length,offset.
+    * outpath: str. Pathway to store the results.
+    * covType: str. get coverage at position level or at the gene level.
+    * genes: list. If setted it will only get coverage for the genes provided, if not it will calculate all genes.
+    * pr_cov_level: str. codon is to calculate in codon coverage. nt
+    If covType is pos: each line of output would be "geneid    protein access    coverage at each position"
+    If covType is gene: each line of output would be "geneid    total count    length of total CDS positions"
+    """
+    if not os.path.exists(outpath): os.mkdir(outpath)
+    cov_df,cds_df,cds_obj,exn_df,pr_rna_dict,gene_array_set,off_len_dic = wrap4gene_pr_cov_func(covFile,cdsFile,exnFile,allIDFile,ribo_offset_file)
+    # 7) get all genes
     if genes==[]:
-        genes = trpr_obj.all_gene_ids()
+        genes = cds_obj.all_gene_ids()
     genes = natsorted(genes)
-    # 6) get coverage for each gene
+    # 8) get coverage for each gene
     if covType == 'pos':
         handle = open(outpath+'/'+covFile.split('.')[0]+'_prpos.txt','w')
         for g in genes:
             gene_cov_df = pd.DataFrame()
             try:
-                gene_df = cds_df[cds_df['geneid'].values==g]
-                g_obj = trpr(gene_df)
-                long_pr = g_obj.get_longest_trpr(g)  # longest protein of the gene
-                pos = g_obj.get_trpr_pos(long_pr) # position of the protein
+                # get protein position
+                gene_cds_df = cds_df[cds_df['geneid'].values==g]
+                g_cds_obj = trpr(gene_cds_df)
+                long_pr = g_cds_obj.get_longest_trpr(g)  # longest protein of the gene
+                # get mRNA position
+                rna = pr_rna_dict[long_pr]
+                g_exn_df = exn_df[exn_df['geneid'].values==g]
+                g_exn_obj = trpr(g_exn_df)
+                rna_pos = g_exn_obj.get_trpr_pos(rna) # mRNA position
+                # filter chromosome coverage
+                chrom = g_cds_obj.get_chrom(g)
+                chr_df = cov_df[cov_df['chr'].values==chrom]  # get the coverage for that chromosome
                 for offset in natsorted(off_len_dic):  # alignment length
-                    off_cov_df = cov_df[cov_df['len'].isin(off_len_dic[offset])]
+                    off_cov_df = chr_df[chr_df['len'].isin(off_len_dic[offset])]
                     off = offset + 1
                     # if gene is NeoR, offset change to 16 for all alignment length
                     if g == 'NeoRKanR':
                         off = 17
                     # end
-                    if pos[0]>pos[1]: # - strand
-                        new_pos = range(pos[0]+off,pos[0],-1) + pos[:-off]
-                    else:
-                        new_pos = range(pos[0]-off,pos[0]) + pos[:-off]
-                    cov_pos = posCoverage(gene_df,off_cov_df,new_pos,gene_array_set)
-                    gene_cov_df[str(offset)] = pd.Series(cov_pos)
+                    new_pos = g_cds_obj.get_ribo_pr_pos(long_pr,rna_pos,off)
+                    cov_pos = posCoverage(gene_cds_df,off_cov_df,new_pos,gene_array_set)
+                    gene_cov_df[str(off)] = pd.Series(cov_pos)
             except:
                 print g,'maps to multiple scaffold'
                 continue
@@ -1181,29 +1303,33 @@ def gene_pr_cov(covFile,cdsFile,ribo_offset_file,outpath,covType='pos',genes=[],
             elif pr_cov_level == 'nt':
                 pr_cov = [str(p) for p in gene_cov]
             handle.write(g+'\t'+long_pr+'\t'+'\t'.join(pr_cov)+'\n')
-    else:  # covType == 'gene'
+    else:  # covType == 'gene' includes all CDS in that gene
         handle = open(outpath+'/'+covFile.split('.')[0]+'_geneCount.txt','w')
         handle.write('\t'.join(['GeneID','count','length'])+'\n')
         for g in genes:
             gene_cov_df = pd.DataFrame()
             try:
-                gene_df = cds_df[cds_df['geneid'].values==g]
-                g_obj = trpr(gene_df)
-                pos = g_obj.get_trpr_pos(g,level='gene') # position of the protein
-                for offset in natsorted(off_len_dic):  # alignment length
-                    off_cov_df = cov_df[cov_df['len'].isin(off_len_dic[offset])]
-                    off = offset + 1
-                    if pos[0]>pos[1]: # - strand
-                        new_pos = range(pos[0]+off,pos[0],-1) + pos[:-off]
-                    else:
-                        new_pos = range(pos[0]-off,pos[0]) + pos[:-off]                    
-                    cov_pos = posCoverage(gene_df,off_cov_df,new_pos,gene_array_set)
-                    gene_cov_df[str(off)] = pd.Series(cov_pos)
+                # get protein position
+                gene_cds_df = cds_df[cds_df['geneid'].values==g]
+                g_cds_obj = trpr(gene_cds_df)
+                chrom = g_cds_obj.get_chrom(g)
+                chr_df = cov_df[cov_df['chr'].values==chrom]  # get the coverage for that chromosome
+                pos_pr = list(set(gene_cds_df[gene_cds_df['strand'].values=='+']['access'].tolist()))
+                neg_pr = list(set(gene_cds_df[gene_cds_df['strand'].values=='-']['access'].tolist()))
+                if pos_pr != []:
+                    pos_sum_cov,pos_pos = all_pos4gene_total_cov(pos_pr,gene_cds_df,g_cds_obj,exn_df,chr_df,pr_rna_dict,off_len_dic,gene_array_set,strand='+')
+                else:
+                    pos_sum_cov = 0;pos_pos=[]
+                if neg_pr != []:
+                    neg_sum_cov,neg_pos= all_pos4gene_total_cov(neg_pr,gene_cds_df,g_cds_obj,exn_df,chr_df,pr_rna_dict,off_len_dic,gene_array_set,strand='-')
+                else:
+                    neg_sum_cov = 0;neg_pos=[]
+                total_cov = pos_sum_cov + neg_sum_cov
             except:
                 print g,'maps to multiple scaffold'
                 continue
-            gene_cov = gene_cov_df.sum(axis=1).tolist()
-            handle.write('\t'.join([g,str(sum(gene_cov)),str(len(gene_cov))])+'\n')
+            all_pos = list(set(pos_pos+neg_pos))
+            handle.write('\t'.join([g,str(total_cov),str(len(all_pos))])+'\n')
     handle.close()
             
 
@@ -1294,6 +1420,108 @@ def gene_tr_cov(exnFile,cdsFile,all_id_file,covFile,outpath,genes=[],offset='no'
     handle.close()        
 
 
+def gene_window_cov(covFile,cdsFile,exnFile,allIDFile,ribo_offset_file,outpath,up,down,center_pos='tss',genes=[],pr_cov_level='nt'):
+    """
+    This function calculates the coverage of a window centered at TSS or TSE.
+    * covFile: str. Filename with 6 columns. 
+    * cdsFile: str. Filename with 6 columns.
+    * exnFile: str. Filename with 6 columns.
+    * allIDFile: str. Filename with all type of id from gff file.
+    * ribo_offset_file: str. Filename with 2 columns: length,offset.
+    * outpath: str. Pathway to store the results.
+    * up,down: int. Up and downstream of the center_position.
+    * center_pos: 'tss' or 'tse'
+    * genes: list. If setted it will only get coverage for the genes provided, if not it will calculate all genes.
+    * pr_cov_level: str. codon is to calculate in codon coverage. nt
+    If covType is pos: each line of output would be "geneid    protein access    coverage at each position"
+    If covType is gene: each line of output would be "geneid    total count    length of total CDS positions"
+    """
+    if not os.path.exists(outpath): os.mkdir(outpath)
+    cov_df,cds_df,cds_obj,exn_df,pr_rna_dict,gene_array_set,off_len_dic = wrap4gene_pr_cov_func(covFile,cdsFile,exnFile,allIDFile,ribo_offset_file)
+    # 1) get all genes
+    if genes==[]:
+        genes = cds_obj.all_gene_ids()
+    genes = natsorted(genes)
+    # 2) get coverage for window each gene
+    outFile = outpath+'/'+covFile.split('.')[0]+'_prpos.txt'
+    handle = open(outFile,'w')
+    col = range(-up,down+1)
+    col = [str(p) for p in col]
+    handle.write('\t'.join(['GeneID','Pr']+ col) + '\n')
+    for g in genes:
+        gene_cov_df = pd.DataFrame()
+        try:
+            # get protein position
+            gene_cds_df = cds_df[cds_df['geneid'].values==g]
+            g_cds_obj = trpr(gene_cds_df)
+            long_pr = g_cds_obj.get_longest_trpr(g)  # longest protein of the gene
+            # get mRNA position
+            rna = pr_rna_dict[long_pr]
+            g_exn_df = exn_df[exn_df['geneid'].values==g]
+            g_exn_obj = trpr(g_exn_df)
+            rna_pos = g_exn_obj.get_trpr_pos(rna) # mRNA position
+            # filter chr coverage
+            chrom = g_cds_obj.get_chrom(g)
+            chr_df = cov_df[cov_df['chr'].values==chrom]  # get the coverage for that chromosome
+            for offset in natsorted(off_len_dic):  # alignment length
+                off_cov_df = chr_df[chr_df['len'].isin(off_len_dic[offset])]
+                off = offset
+                # if gene is NeoR, offset change to 16 for all alignment length
+                if g == 'NeoRKanR':
+                    off = 16
+                # end
+                pr_ribo_pos = g_cds_obj.get_ribo_pr_pos(long_pr, rna_pos, off)
+                tr_ribo_pos = g_exn_obj.get_ribo_pr_pos(rna,rna_pos,off)
+                new_pos = get_window_pos(pr_ribo_pos,tr_ribo_pos,up,down,center_pos)
+                cov_pos = posCoverage(gene_cds_df,off_cov_df,new_pos,gene_array_set)
+                gene_cov_df[str(off)] = pd.Series(cov_pos)
+        except:
+            print g,'maps to multiple scaffold'
+            continue
+        gene_cov = gene_cov_df.sum(axis=1).tolist()
+        
+        if pr_cov_level == 'codon':
+            pr_cov = [str(sum(p)) for p in chunks(gene_cov,3)]
+        elif pr_cov_level == 'nt':
+            pr_cov = [str(p) for p in gene_cov]
+        handle.write(g+'\t'+long_pr+'\t'+'\t'.join(pr_cov)+'\n')
+# cds_file = '/data/shangzhong/RibosomeProfiling/Database/01_pr_cds.txt'
+# exn_file = '/data/shangzhong/RibosomeProfiling/Database/01_pr_rna.txt'
+# all_id = '/data/shangzhong/RibosomeProfiling/Database/combined_AllIDS.txt'
+# cds_df = pd.read_csv(cds_file,sep='\t',header=0,low_memory=False)
+# exn_df = pd.read_csv(exn_file,sep='\t',header=0,low_memory=False)
+# cds_obj = trpr(cds_df)
+# exn_obj = trpr(exn_df)
+# id_df = pd.read_csv(all_id,sep='\t',header=0,low_memory=False)
+# pr_tr_dic = id_df.set_index('PrAccess')['TrAccess'].to_dict()
+# genes = cds_obj.all_gene_ids()
+# genes = natsorted(genes)
+# diff_genes = []
+# for g in genes:
+#     try:
+#         gene_df = cds_df[cds_df['geneid'].values==g]
+#         g_obj = trpr(gene_df)
+#         long_pr = g_obj.get_longest_trpr(g)  # longest protein of the gene
+#         pos = g_obj.get_trpr_pos(long_pr) # position of the protein
+#         tr = pr_tr_dic[long_pr]
+#         rna_df = exn_df[exn_df['geneid'].values==g]
+#         tr_obj = trpr(rna_df)
+#         tr_pos = tr_obj.get_trpr_pos(tr)
+#     except:
+#         continue
+#     # calculate distance
+#     diff1 = tr_pos[:tr_pos.index(pos[0])]
+#     
+#     if tr_pos[0]>tr_pos[1]:
+#         diff2 = range(tr_pos[0],pos[0],-1)
+#     else:
+#         diff2 = range(tr_pos[0],pos[0])
+#     if diff1[-17:] != diff2[-17:]:
+#         diff_genes.append(g)
+#         print long_pr, 'start not in 1st exon'
+# print len(diff_genes)
+    
+        
 def merge_rep_gene_pos_cov(totalCount,covFiles,gene,exn_df,covType='trpt'):
     """
     This function calculates the ribo seq coverage at each position and . and then merge the replicates.
@@ -1498,7 +1726,10 @@ def genes_frame_cov(pr_pos_cov_file,out_path,genes=[],calType='sum'):
         if (genes!=[]) and (geneid not in genes): continue
         cov = item[2:]  # coverage
         cov = [int(p) for p in cov]
-        if sum(cov) < 128:
+        codon_cov = chunk(cov,3)
+        codon_cov = map(sum,codon_cov)
+        codon_cov = [p/3.0 for p in codon_cov]
+        if np.median(np.array(codon_cov)) == 0:
             continue
         frames = frame_count(cov,calType)
         frames = [str(p) for p in frames]

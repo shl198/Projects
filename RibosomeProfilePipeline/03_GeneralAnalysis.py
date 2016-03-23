@@ -30,6 +30,7 @@ codon_AA_freq_path = bam_path + '/06_codon_AA_freq'
 utr3_cov_path = bam_path + '/07_utr3_cov'
 pr_ntcov_path = bam_path + '/08_pr_ntpos_cov'
 frame_cov_path = bam_path + '/09_frame_cov'
+wind_cov_path = bam_path + '/10_window_cov'
 
 all_id_file = db_path + '/combined_AllIDS.txt'  # part 8
 cdsFile = db_path + '/01_pr_cds.txt' # part 8
@@ -47,20 +48,19 @@ def chunk(l,n):
 # os.chdir(fwd_rev_path)
 # covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('cov.txt')]
 # covFiles = natsorted(covFiles)
+# 
 # cdsFile = db_path + '/01_pr_cds.txt'
-# #gene_pr_cov(covFiles[1],cdsFile,ribo_offset_file,pr_cov_path+'/old')
+# # gene_pr_cov(covFiles[0],cdsFile,exnFile,all_id_file,ribo_offset_file,'/data/shangzhong/RibosomeProfiling/Ribo_align',covType='pos',genes=['heavychain'],pr_cov_level='nt')
 # #------------- pr_pos_cov ------------
-# proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,pr_cov_path,)) for covFile in covFiles]
-# for p in proc:
-#     p.start()
-# # for p in proc:
-# #     p.join()
+# proc1 = [Process(target=gene_pr_cov,args=(covFile,cdsFile,exnFile,all_id_file,ribo_offset_file,pr_cov_path,'pos',[],'codon')) for covFile in covFiles]
 # #------------- pr_ntpos_cov ------------
-# proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,pr_ntcov_path,'pos',[],'nt',)) for covFile in covFiles]
-# for p in proc:
-#     p.start()
-# for p in proc:
-#     p.join()
+# proc2 = [Process(target=gene_pr_cov,args=(covFile,cdsFile,exnFile,all_id_file,ribo_offset_file,pr_ntcov_path,'pos',[],'nt',)) for covFile in covFiles]
+# for p1,p2 in zip(proc1,proc2):
+#     p1.start()
+#     p2.start()
+# for p1,p2 in zip(proc1,proc2):
+#     p1.join()
+#     p2.join()
 # 
 # #===============================================================================
 # #                     2. gene total ribosome count for each gene (restuls in 04_gene_total_count)
@@ -70,12 +70,11 @@ def chunk(l,n):
 # covFiles = natsorted(covFiles)
 # cdsFile = db_path + '/01_pr_cds.txt'
 # #gene_pr_cov(covFiles[0],cdsFile,ribo_offset_file,gene_count_path,'gene',['heavychain'])
-# proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,ribo_offset_file,gene_count_path,'gene',)) for covFile in covFiles]
+# proc = [Process(target=gene_pr_cov,args=(covFile,cdsFile,exnFile,all_id_file,ribo_offset_file,gene_count_path,'gene',)) for covFile in covFiles]
 # for p in proc:
 #     p.start()
 # for p in proc:
 #     p.join()
-# 
 # #===============================================================================
 # #                     3. Detect Stalling sites (results in 05_stall_sites)
 # #===============================================================================
@@ -367,5 +366,26 @@ plt.savefig(fig_path + '/04_AA_freq.svg')
 #     p.start()
 # for p in proc:
 #     p.join()
-
+#===============================================================================
+#                         10. window coverage of around tss or tse
+#===============================================================================
+# up=100
+# down=50
+# os.chdir(fwd_rev_path)
+# covFiles = [f for f in os.listdir(fwd_rev_path) if f.endswith('.txt')]
+# if not os.path.exists(wind_cov_path): os.mkdir(wind_cov_path)
+# tss_cov_path = wind_cov_path + '/tss'
+# # gene_window_cov(covFiles[0],cdsFile,exnFile,all_id_file,ribo_offset_file,tss_cov_path,up,down,center_pos='tss',genes=['heavychain'],pr_cov_level='nt')
+# proc1 = [Process(target=gene_window_cov,args=(f,cdsFile,exnFile,all_id_file,ribo_offset_file,
+#                 tss_cov_path,up,down,'tss',[],'nt',)) for f in covFiles]
+# tse_cov_path = wind_cov_path +'/tse'
+# proc2 = [Process(target=gene_window_cov,args=(f,cdsFile,exnFile,all_id_file,ribo_offset_file,
+#                 tse_cov_path,up,down,'tse',[],'nt',)) for f in covFiles]
+#  
+# for p1,p2 in zip(proc1,proc2):
+#     p1.start()
+#     p2.start()
+# for p1,p2 in zip(proc1,proc2):
+#     p1.join()
+#     p2.join()
 
