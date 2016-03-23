@@ -1,6 +1,15 @@
 from Bio import SeqIO
 import os,subprocess
 import pandas as pd
+from p05_ParseGff import extractAllGffIDs
+from Bio.SeqRecord import SeqRecord
+from Bio import Seq
+
+def chunk(l,n):
+    n = max(1,n)
+    result = [l[i:i+n] for i in range(0,len(l),n)]
+    return result
+
 def change_ncbi_annotation_name(inputFa,inter='inter.fa'):
     """
     this function changes the reference name of fasta file to accession number
@@ -165,3 +174,83 @@ def chrLength(fa):
     df.to_csv(out,sep='\t',index=False)
 # fa= '/data/shangzhong/RibosomeProfiling/Database/combined.fa'
 # chrLength(fa)
+
+def sub_scaffold(fa,gffFile,genes,sub_fa):
+    """
+    This function extract scaffolds on which locate the genes provided.
+    * fa: str. File name of reference fasta file
+    * gffFile: str. Annotation file
+    * genes: list. A list of gene symbols.
+    * outIDFile: str. File name that stores all ids from gff file. 
+    """
+    # 1. read fa file
+    ref_dict = SeqIO.index(fa,'fasta')
+    # 2. get chromosome of all genes
+    ID_file = 'inter_ID.txt'
+    extractAllGffIDs(ID_file,gffFile,'ncbi')
+    ID_df = pd.read_csv(ID_file,sep='\t',header=0) # names=['GeneID','GeneSymbol','Chrom','TrAccess','PrAccess']
+    gene_df = ID_df[ID_df['GeneSymbol'].isin(genes)]
+    chroms = list(set(gene_df['Chrom'].tolist()))
+    os.remove(ID_file)
+    # 3. output the chromosome sequence to file
+    out_handle = open(sub_fa,'w')
+    for chrom in chroms:
+        chr_seq = ref_dict[chrom]
+        SeqIO.write(chr_seq,out_handle,'fasta')
+
+
+def divide_scaffold_by_len(faFile,n_part,out_path):
+    """
+    This function sort the genome by length and then separate them in to n groups. Each group have similar amound the total nucleotide
+    * faFiles: str. Fasta file.
+    * n_part: int. Separate to several groups.
+    """
+    n_part = int(n_part)
+    reference = SeqIO.parse(open(faFile,'rU'),'fasta')
+    chrom_len = {}
+    for item in reference:
+        chrom = item.id
+        if chrom in chrom_len:
+            assert False,'repeated reference'
+        chrom_len[chrom] = len(item.seq)
+    # transfer to pandas table
+    chrom_len_df = pd.DataFrame(chrom_len.items(),columns=['chr','len'])
+    chrom_len_df = chrom_len_df.sort('len')
+    chrs = chrom_len_df['chr'].tolist()
+    res = [[] for i in range(n_part)]
+    for i in range(len(chrs)):
+        res[i%n_part].append(chrs[i])
+    if not os.path.exists(out_path): os.mkdir(out_path)
+    for i in range(len(res)):
+        handle = open(out_path + '/L'+str(i)+'.list','w')
+        handle.write('\n'.join(res[i]))
+        handle.close()
+
+def stitch_scaffolds(fa,outFile,len_limit=200000000,dist=500):
+    """
+    This function merge multiple scaffold together to form a longer sequence. 
+    * fa: str. Reference fa file name
+    * outFile: str. Filename output to the file.
+    * len_limit: int. Maximum length of each merged scaffold.
+    * dist: int. Distance between each scaffold.
+    """
+    in_handle = open(fa,'r')
+    out_handle = open(outFile,'w')
+    sequence = ''
+    n = 1
+    for record in SeqIO.parse(in_handle,'fasta'):
+        sequence += str(record.seq)
+        if len(sequence) >= len_limit:
+            item = SeqRecord(Seq(sequence), id = 'chr'+str(n),description="")
+            SeqIO.write(item,out_handle,'fasta')
+            sequence = ''
+            n += 1
+        else:
+            sequence += 'N'*500
+    if sequence != '':
+        item = SeqRecord(Seq(sequence[:-500]), id = 'chr'+str(n),description="")
+        SeqIO.write(item,out_handle,'fasta')
+    # output the last one
+    handle = open(outFile)
+    for record in SeqIO.parse(handle,'fasta'):
+        print len(record.seq)

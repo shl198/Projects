@@ -117,7 +117,7 @@ def bowtie_rRNA(fastqFiles,database,thread=1):
     This function runs bowtie to align reads to rRNA and output the reads that don't align to rRNA
     
     * fastqFiles: list of fastqFiles. paired_end:[[f1.fq.gz,f2.fq.gz]]. single_end:[[f1.fq.gz]]
-    * database: index of bowtie2
+    * database: index of bowtie
     * thread: number of thread to use
     """
     map_result = []
@@ -135,6 +135,30 @@ def bowtie_rRNA(fastqFiles,database,thread=1):
             subprocess.call('gzip {f}'.format(f=output),shell=True)
     
     return map_result
+
+
+def bowtie(fastqFiles,database,thread=1,otherParameters=['']):
+    """
+    This function runs bowtie to align reads to rRNA and output the reads that don't align to rRNA
+    
+    * fastqFiles: list of fastqFiles. paired_end:[[f1.fq.gz,f2.fq.gz]]. single_end:[[f1.fq.gz]]
+    * database: index of bowtie
+    * thread: number of thread to use
+    """
+    map_result = []
+    for fastq in fastqFiles:
+        if fastq[0].endswith(".fastq.gz"):
+            output = fastq[0][:-8] + 'sam'
+        else:
+            output = fastq[0][:-5] + 'sam'
+        map_result.append(output)
+        if len(fastq) == 2:
+            cmd = ('bowtie -l 23 -p {thread} -S {db} -1 <(gunzip -c {fq1}) -2 <(gunzip -c {fq2}) > {output} ').format(
+                           thread=str(thread),db=database,fq1=fastq[0],fq2=fastq[1],output=output)
+            cmd = cmd + ' '.join(otherParameters)
+            subprocess.call(cmd,shell=True,executable='/bin/bash')
+    return map_result    
+
 #============  Tophat Alignment  =======================            
 def tophat(fastqFiles,database,annotation,thread=1,otherParameters=['']):
     """
@@ -209,6 +233,17 @@ def blastn(faFiles,database,thread = 1):
         subprocess.check_call(blastn,shell=True,executable='/bin/bash')
     return map_result
 #============ bwa alignment  ===============================
+def bwa_Db(bwaDb,ref_fa):
+    """
+    This function build db for bwa
+    * bwaDb: str. Pathway to store the index
+    * ref_fa: str. Reference genome fa file.
+    * thread: int. Numbre of thread
+    """
+    os.chdir(bwaDb)
+    cmd = ('bwa index -p bwa -a bwtsw {fa}').format(fa=ref_fa)
+    subprocess.call(cmd,shell=True)
+
 def bwa_vari(readgroup,fqFiles,database,thread=1):
     """
     this function run bwa, whose downstream analysis is to find variant
@@ -216,7 +251,7 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
     map_result = []
     bwaCmd = ''
     for fastq,rg in zip(fqFiles,readgroup):
-        rg = rg + '\\tPL:illumina\\tLB:lib20000\\tPU:unit1'
+        rg = rg + '\\\\tPL:illumina\\\\tLB:lib20000\\\\tPU:unit1'
         if fastq[0].endswith(".fastq.gz"):
             output = fastq[0][:-8] + 'sam'
         else:
@@ -232,10 +267,12 @@ def bwa_vari(readgroup,fqFiles,database,thread=1):
                        '{database} {fq} > {output} && ').format(thread=thread,
                         readgroup=rg,database=database,fq=fastq[0])
     print bwaCmd[:-3]
-    subprocess.call(bwaCmd[:-3],shell=True)
+    ret = subprocess.call(bwaCmd[:-3],shell=True)
+    if ret == 1:
+        raise
     return map_result        
 #============  STAR alignment  ===============================
-def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
+def STAR_Db(db_path,ref_fa,thread=1,annotation = '',genomeSize='large'):
     """
     This function generates database for alignment using STAR
     """
@@ -248,6 +285,8 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = ''):
         if annotation != '':
             cmd = cmd + ('--sjdbGTFfile {gff3} --sjdbGTFtagExonParentTranscript Parent '
                          '--sjdbOverhang 100').format(gff3=annotation)   # for geneDb add --sjdbGTFfeatureExon CDS
+        if genomeSize == 'small':
+            cmd = cmd + '--genomeChrBinNbits 6 --genomeSAindexNbases 4'
     print cmd
     subprocess.check_call(cmd,shell=True)
     
@@ -259,7 +298,9 @@ def STAR(fastqFiles,db_path,thread=1,annotation='',otherParameters=['']):
     map_results = []
     cmd = ''
     if annotation != '':
-            otherParameters.extend(['--sjdbGTFfile {gff}'.format(gff=annotation), '--sjdbGTFtagExonParentTranscript Parent'])
+        otherParameters.extend(['--sjdbGTFfile {gff}'.format(gff=annotation)])
+    if annotation.endswith('gff'):
+        otherParameters.append('--sjdbGTFtagExonParentTranscript Parent')
     for fastq in fastqFiles:
         #------- define output sam file name ----
         if fastq[0].endswith(".fastq.gz"):
@@ -277,7 +318,7 @@ def STAR(fastqFiles,db_path,thread=1,annotation='',otherParameters=['']):
                          '--readFilesCommand zcat '
                          '--readFilesIn {fq1} {fq2} --runThreadN '
                          '{thread} --outFileNamePrefix {output} '
-                         '--outSAMunmapped Within').format(
+                         ).format(
                         ref=db_path,fq1=fastq[0],fq2=fastq[1],
                         thread=thread,output=output)
             cmd = cmd + starCmd + ' ' + ' '.join(otherParameters) + ' && '
@@ -286,7 +327,7 @@ def STAR(fastqFiles,db_path,thread=1,annotation='',otherParameters=['']):
                          '--readFilesCommand zcat '
                          '--readFilesIn {fq1} --runThreadN '
                          '{thread} --outFileNamePrefix {output} '
-                         '--outSAMunmapped Within').format(
+                         ).format(
                         ref=db_path,fq1=fastq[0],
                         thread=thread,output=output)
             cmd = cmd + starCmd + ' ' + ' '.join(otherParameters) + ' && '
@@ -320,5 +361,26 @@ def STAR2Pass(fastqFiles,starDb,ref_fa,thread=1):
     subprocess.check_call('rm -r starDb2Pass',shell=True)
     return map_sams
 
-
-    
+#============  Pacbio alignment  ===============================
+def blasr(faFiles,ref_fa,thread=1,otherParameters=[]):
+    """This function runs blasr for alignment
+    * faFiles: a list of fa files that has pacbio reads.
+    * ref_fa: reference genome
+    * thread: int. number of threads
+    """
+    outFiles = []
+    cmd = ''
+    for fa in faFiles:
+        if fa.endswith('fa'):
+            out = fa[:-2]+'sam'
+        else:
+            out = fa[:-5]+'sam'
+        outFiles.append(out)
+        cmd = cmd + ('blasr {input} {ref} -sam -out {out} -nproc {thread} '.format(
+                    input=fa,ref=ref_fa,out=out,thread=str(thread)))
+        if otherParameters != []:
+            cmd = cmd + ' '.join(otherParameters)
+        cmd = cmd + ' && '
+    print cmd
+    subprocess.call(cmd[:-3],shell=True)
+    return outFiles

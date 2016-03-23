@@ -1,3 +1,4 @@
+import os
 from os import listdir
 import subprocess
 import copy
@@ -99,7 +100,10 @@ def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):  # 
                 trimCmd2nd = 'SLIDINGWINDOW:5:10 LEADING:5 TRAILING:3 MINLEN:22 TOPHRED33 & '
                 cmd = cmd + trimCmd1st + adaptCmd + trimCmd2nd
         print cmd
-        call = subprocess.check_output(cmd + 'wait %1; echo $?',shell=True)
-        if call[0]=='1':
-            raise
+        subprocess.check_output(cmd + 'wait',shell=True)
+    path = os.getcwd()
+    fqs = [f for f in os.listdir(path) if f.startswith('unpair')]
+    for f in fqs: os.remove(f)
+#         if call[0]=='1':
+#             raise
     return trimmedFiles

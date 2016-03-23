@@ -59,10 +59,15 @@ def sam2bam_sort(samfiles,thread=1,sortType=''):
         rmBamCmd = rmBamCmd + 'rm {bam} & '.format(bam=bam)
 
     if samfiles[0].endswith('sam'):
-        subprocess.check_call(sam2bamCmd[:-3],shell=True)    
+        print sam2bamCmd
+        subprocess.check_call(sam2bamCmd[:-3],shell=True)
+    print rmSamCmd
     subprocess.check_call(rmSamCmd[:-3],shell=True)
+    print sortBamCmd
     subprocess.check_call(sortBamCmd[:-3],shell=True)
-    subprocess.check_call(indexCmd + 'wait',shell=True)
+    if tag == '':
+        subprocess.check_call(indexCmd + 'wait',shell=True)
+    print rmBamCmd
     subprocess.check_call(rmBamCmd + 'wait',shell=True)
     return sorted_files
 

@@ -1,7 +1,7 @@
 import sys
 from Bio import SeqIO
 from Modules.p05_ParseGff import *
-
+from natsort import natsorted
 #===============================================================================
 #                 snpEff and snpSift
 #===============================================================================
@@ -230,6 +230,21 @@ def merge_all_provean_scores(previousFile,ref_name,*pathways):
 #                          '/data/shangzhong/VariantCall/pgsa_VS_chok1/filteredVcfResults'
 #                          )
 # print 'done'
+def merge_provean_results(folder,outFile):
+    os.chdir(folder)
+    files = [f for f in os.listdir(folder) if f.endswith('proveanScore.txt')]
+    files = natsorted(files)
+    df1 = pd.read_csv(files[0],sep='\t',header=0,names=['g_t_id','vari',files[0][:-16]])
+    df1 = df1.drop_duplicates()
+    for f in files[1:]:
+        df = pd.read_csv(f,sep='\t',header=0,names=['g_t_id','vari',f[:-16]])
+        df = df.drop_duplicates()
+        df1=df1.merge(df,on=['g_t_id','vari'],how='outer')
+    df1.to_csv(outFile,sep='\t',index=False)
+# folder = '/data/shangzhong/DNArepair/Annotation/Provean_results'
+# outFile = '/data/shangzhong/DNArepair/Annotation/FinalResults.txt'
+# merge_provean_results(folder,outFile)
+
 
 def merge_all_genes_with_diff_pr_from_refseq(previousFile,outputFile,commonFileName,*pathways):
     """

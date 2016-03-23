@@ -1,4 +1,4 @@
-import os,subprocess,sys
+import subprocess
 
 def Trinity(files,thread):
     """
@@ -17,4 +17,5 @@ def Trinity(files,thread):
             seqtype = 'fq'
         cmd = ('Trinity --seqType {seqtype} --max_memory 50G --left {f1} --right {f2} --CPU {t}').format(
                                                         seqtype=seqtype,f1=files[0],f2=files[1],t=thread)
+    print cmd
     subprocess.call(cmd.split(' '))

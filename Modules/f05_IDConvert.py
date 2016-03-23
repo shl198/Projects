@@ -20,7 +20,9 @@ def geneSymbol2EntrezID(DictFile,output_path,inputpath,sym2ID='yes'):
               if no : ID to symbol
     """
     allFiles = os.listdir(inputpath)
-    filelist = [f for f in allFiles if f.endswith('.txt')]
+    filelist = [f for f in allFiles if f.endswith('sort.txt')]
+    if filelist == []:
+        assert False, 'no file in the input folder'
     #=========== build dictionary ============
     dic = {}
     result = open(DictFile,'r')

@@ -29,7 +29,7 @@ def cufflinks(bamFiles,annotation,thread,otherParameters=['']):
 #                 merge cufflinks
 #===============================================================================
 def merge_cuff_fpkm_cho(path,ConvertFile):
-    """This function merge the cufflink fpkm results to one file for CHO genome
+    """This function merges the cufflink fpkm results to one file for CHO genome
     * path: str. Path in which each subfolder is results of one sample.
     * ConvertFile: str. The file that includes 3 columns [geneid, genesymbol,chromosome]
     """
@@ -66,4 +66,4 @@ def merge_cuff_fpkm(path):
         dfs.append(df)
     res_df = pd.concat(dfs,axis=1)
     res_df.to_csv('merged.txt',sep='\t')
-#merge_cuff_fpkm('/data/shangzhong/DE/fpkm/01_result')
+#merge_cuff_fpkm('/data/shangzhong/DE/FDA/cufflinks')

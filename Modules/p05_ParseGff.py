@@ -78,7 +78,7 @@ def extract_gff4cufflink_symbol2ID(outputFile,gffFile,source,transcript='no',pro
             except:
                 continue
             outline = [trID,trAc]
-        else:
+        else:  # 'transcript == 'no'
             outline = []
         if protein == 'yes':
             if item[2] != 'CDS': continue
@@ -92,7 +92,7 @@ def extract_gff4cufflink_symbol2ID(outputFile,gffFile,source,transcript='no',pro
                     index = index + 1
             except:
                 continue
-        # get transcript id
+        # get protein's transcript id
             try:
                 index = des.index('Parent=')
                 index = index + len('Parent=')
@@ -104,7 +104,7 @@ def extract_gff4cufflink_symbol2ID(outputFile,gffFile,source,transcript='no',pro
                 continue
             outline = [trID,prid]
         else:
-            outline = []
+            pass
         # get gene id
         try:
             index = des.index(geneID)
@@ -147,9 +147,9 @@ def extractAllGffIDs(outputFile,gffFile,source):
     df2 = pd.read_csv(file2,header=None,sep='\t',names=['GeneID','GeneSymbol','Chrom','TrID','PrAccess'])
     df = pd.merge(df1,df2,how='outer',on=['GeneID','GeneSymbol','Chrom','TrID'])
     df.fillna('-',inplace=True)
-    df[['GeneID','GeneSymbol','Chrom','TrAccess','PrAccess']].to_csv(outputFile,sep='\t',index=False)
-# gff3 ='/data/shangzhong/RibosomeProfiling/Database/combined.gff'
-# extractAllGffIDs('/data/shangzhong/RibosomeProfiling/combined_AllIDS.txt',gff3,'ncbi')
+    df[['GeneID','GeneSymbol','Chrom','TrAccess','PrAccess','TrID']].to_csv(outputFile,sep='\t',index=False)
+# gff3 ='/data/shangzhong/DNArepair/Database/hamster.gff'
+# extractAllGffIDs('/data/shangzhong/DNArepair/Database/hamster_AllIDS.txt',gff3,'ncbi')
 
 def removeIDVersion(ID):
     """
@@ -165,8 +165,7 @@ def removeIDVersion(ID):
 def extractAllPr(gffFile,feature='CDS',out=''):
     """
     This function converts gff file to file for a list of genes in the input. Keep different proteins.
-    Only extract exons or CDS of genes.
-    
+    Only extract exons or CDS of genes. File has columns:['Chr','start','stop','GeneID','access','strand']
     * gffFile: str. Filename of gff file
     * genes: list. A list of gene IDs.
     """
@@ -222,8 +221,8 @@ def extractAllPr(gffFile,feature='CDS',out=''):
     #df['Pr_Access'] = df['Pr_Access'].astype(str).apply(lambda x: removeIDVersion(x))
     df['GeneID'] = df['GeneID'].astype(str)
     df.to_csv(out,index=False,sep='\t')
-# gffFile = '/data/shangzhong/RibosomeProfiling/Database/combined.gff'
-# extractAllPr(gffFile,feature='exon',out='/data/shangzhong/RibosomeProfiling/cho_pr/10_rna_exon.txt')
+# gffFile = '/data/shangzhong/DNArepair/Database/hamster.gff'
+# extractAllPr(gffFile,feature='CDS',out='/data/shangzhong/DNArepair/Database/super_scaffold/hamster.cds.txt')
 
 #===============================================================================
 #                      some basic sequence process
@@ -362,8 +361,6 @@ def get_AA_from_gff(refDNA_dic,gffFile,chrom,gene,transcript,outputFile=''):
     AA = Seq.translate(transcript_seq)
     if AA.endswith('*'):
         AA = AA[:-1]
-    #AA = RNA2Pr(transcript_seq,CodonFile)
-    
     #------- (4) get the online protein sequence-----
     try:
         index = exon_loci_list[0].index('protein_id=')
@@ -382,11 +379,11 @@ def get_AA_from_gff(refDNA_dic,gffFile,chrom,gene,transcript,outputFile=''):
             else:
                 filename = outputFile    
             with open(filename,'a') as f:
-                f.write('>' + exon_loci_list[0].split('\t')[-1] + '\n' + sequence + '\n\n')
+                f.write('>' + exon_loci_list[0].split('\t')[-1] + '\n' + sequence + '\n\n')  # Online sequence
             with open(filename[:-2]+'gff.fa','a') as f_gff:
-                f_gff.write('>'+gene+'_'+transcript+'_'+protein_id+'\n'+AA+'\n\n')
+                f_gff.write('>'+gene+'_'+transcript+'_'+protein_id+'\n'+AA+'\n\n')   # gff sequence
             with open(filename[:-2]+'id.fa','a') as f_id:
-                f_id.write(gene+'\t'+transcript+'\t'+protein_id+'\n')
+                f_id.write(gene+'\t'+transcript+'\t'+protein_id+'\n')  # inconsistent id file
     except:
         print transcript,'do not have protein id in annotation file'
         
@@ -430,7 +427,7 @@ def get_diff_pr_from_refseq(outputFile,ref_fa,ref_gff3,gene_list_file=''):
                 if gene not in genes:
                     genes.append(gene)
             genes.sort()
-    print 'there are',len(genes),'genes in',ref_gff3
+    print 'there are',len(genes),'genes in gene file'
     # define three list
     query_gene=[];query_chrom=[];query_trid=[]
     # get all genes, chromosomes and trids
@@ -466,17 +463,17 @@ def get_diff_pr_from_refseq(outputFile,ref_fa,ref_gff3,gene_list_file=''):
         except:
             print 'fail to get AA and compare'
             raise
-        
-# outputFile = '/data/shangzhong/RibosomeProfiling/chok1_pr_different_from_refseq.fa'
-#genelist = '/data/shangzhong/VariantCall/CHOk1/genelist.txt'
+
+# outputFile = '/data/shangzhong/DNArepair/hamster_pr_different_from_refseq.fa'
+# genelist = '/data/shangzhong/DNArepair/Database/03_DNA_repair_genes.hamster.txt'
 # get_diff_pr_from_refseq(outputFile,#'/opt/genome/cho/chok1.fa','/opt/genome/cho/chok1.gff3')
-#                         '/data/shangzhong/RibosomeProfiling/Database/combined.fa',
-#                         '/data/shangzhong/RibosomeProfiling/Database/combined.gff')
+#                          '/data/shangzhong/DNArepair/Database/hamster.fa',
+#                          '/data/shangzhong/DNArepair/Database/hamster.gff',genelist)
 
 # outputFile = '/data/shangzhong/VariantCall/Hamster/hamster_pr_different_from_refseq.fa'
 # genelist = '/data/shangzhong/VariantCall/Hamster/genelist.txt'
 # get_diff_pr_from_refseq(outputFile,
-#                         '/opt/genome/hamster/hamster.fa',
-#                         '/opt/genome/hamster/hamster.gff3',genelist)
+#                          '/opt/genome/hamster/hamster.fa',
+#                          '/opt/genome/hamster/hamster.gff3',genelist)
 # print 'job done'
 

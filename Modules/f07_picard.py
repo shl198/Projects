@@ -14,13 +14,12 @@ def sam2sortbam(picard,samfiles):
     """
     this function change samfile to sorted bam file
     """
-    SortSam = picard + '/' + 'SortSam.jar'
     sorted_files = []
     for sam in samfiles:
         sort_bam = sam[:-3] + 'sort.bam'
         sorted_files.append(sort_bam)
-        cmd = ('java -jar {SortSam} INPUT={input} OUTPUT={output} '
-               'SORT_ORDER=coordinate').format(SortSam=SortSam,
+        cmd = ('java -jar {picard} SortSam INPUT={input} OUTPUT={output} '
+               'SORT_ORDER=coordinate').format(picard=picard,
                 input=sam,output=sort_bam)
         subprocess.check_call(cmd,shell=True)
     return sorted_files
@@ -31,16 +30,15 @@ def markduplicates(picard,sortBams):
     """
     if not os.path.exists('tmp'): 
         os.makedirs('tmp')
-    mark = picard + '/' + 'MarkDuplicates.jar'
     dedup_files = []
     cmd = ''
     for bam in sortBams:
         dedup = bam[:-8] + 'dedup.bam'
         dedup_files.append(dedup)
-        cmd = cmd + ('java -Djava.io.tmpdir=tmp -jar {mark} I={input} O={output} CREATE_INDEX=true '
+        cmd = cmd + ('java -Djava.io.tmpdir=tmp -jar {picard} MarkDuplicates I={input} O={output} CREATE_INDEX=true '
         'METRICS_FILE=metrics.txt MAX_RECORDS_IN_RAM=8000000 '
         'MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 '
-        'VALIDATION_STRINGENCY=LENIENT && ').format(mark=mark,input=bam,
+        'VALIDATION_STRINGENCY=LENIENT && ').format(picard=picard,input=bam,
         output=dedup)
     subprocess.check_call(cmd[:-3],shell=True)
     return dedup_files
@@ -49,7 +47,6 @@ def addReadGroup(picard,sortBamFiles,readgroups,batch=1):
     """
     This function adds readgroup to a list of samfiles
     """
-    add = picard + '/' + 'AddOrReplaceReadGroups.jar'
     batch = min(batch,len(sortBamFiles))
     subBams = chunk(sortBamFiles,batch)
     subGroups = chunk(readgroups,batch)
@@ -65,10 +62,11 @@ def addReadGroup(picard,sortBamFiles,readgroups,batch=1):
             PL = 'illumina' #readgroup[3][3:-1]
             LB = 'lib20000' #readgroup[4][3:-1]
             PU = 'unit1' #readgroup[5][3:]
-            cmd = cmd + ('java -jar {addGp} I={input} O={sortbam} '
+            cmd = cmd + ('java -jar {picard} AddOrReplaceReadGroups I={input} O={sortbam} SO=coordinate '
                          'RGID={ID} RGSM={SM} RGPL={PL} RGLB={LB} RGPU={PU} & ').format(
-                        addGp=add,input=sam,sortbam=sortbam,ID=ID,SM=SM,PL=PL,LB=LB,
+                        picard=picard,input=sam,sortbam=sortbam,ID=ID,SM=SM,PL=PL,LB=LB,
                         PU=PU)
+        print cmd
         subprocess.call(cmd + 'wait',shell=True)
 #     # the file name in sortBams is filename.sort.sort.bam, need to change to filename.sort.bam
 #     final_sort_bams = []
@@ -92,24 +90,46 @@ def sam2fastq(picard,samFiles,endType):
     """
     fqs = []
     cmd = ''
-    sam2fq = picard + '/' + 'SamToFastq.jar'
     if endType == 'pair':
         for sam in samFiles:
             fq1 = sam[:-4] + '_1.fq.gz'
             fq2 = sam[:-4] + '_2.fq.gz'
             fqs.append([fq1,fq2])
-            sam2fqCmd = ('java -jar {sam2fq} I={input} F={fq1} F2={fq2} '
+            sam2fqCmd = ('java -jar {picard} SamToFastq I={input} F={fq1} F2={fq2} '
                          'VALIDATION_STRINGENCY=LENIENT').format(
-                        sam2fq=sam2fq,input=sam,fq1=fq1,fq2=fq2)
+                        picard=picard,input=sam,fq1=fq1,fq2=fq2)
             cmd = cmd + sam2fqCmd + ' & '
     else:
         for sam in samFiles:
             fq = sam[:-4] + '.fq.gz'
             fqs.append([fq])
-            sam2fqCmd = ('java -jar {sam2fq} I={input} F={fq} '
+            sam2fqCmd = ('java -jar {picard} SamToFastq I={input} F={fq} '
                          'VALIDATION_STRINGENCY=LENIENT').format(
-                        sam2fq=sam2fq,input=sam,fq=fq)
+                        picard=picard,input=sam,fq=fq)
             cmd = cmd + sam2fqCmd + ' & '
     subprocess.call(cmd + 'wait',shell=True)
     return fqs
 
+
+def sortVCF(picard,vcfFiles,fa_dict,batch=1):
+    """This function reorders chromosome in vcf, making it the same as reference
+    * picard
+    * vcfFile: str.vcf file name
+    * fa_dict: reference.dict that GATK used
+    """
+    VCFs = chunk(vcfFiles,batch)
+    outFiles = []
+    for vcfs in VCFs:
+        cmd = ''
+        outFiles = []
+        for vcf in vcfs:
+            outVCF = vcf[:-3] + 'sort.vcf'
+            outFiles.append(outVCF)
+            cmd = cmd + ('java -jar {picard} SortVcf I={input} O={output} SEQUENCE_DICTIONARY={fa_dict} & ').format(
+                            picard=picard,input=vcf,output=outVCF,fa_dict=fa_dict)
+        print cmd
+        subprocess.call(cmd + 'wait',shell=True)
+        # remove the original files
+        for f_in,f_out in zip(vcfs,outFiles):
+            os.remove(f_in)
+            os.rename(f_out,f_in)
