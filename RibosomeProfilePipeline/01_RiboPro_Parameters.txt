@@ -3,14 +3,14 @@
 # name1.fq.gz, name2.fq.gz or name1.fastq.gz, name2.fastq.gz
 
 ##===============  global parameters ================================
-thread	1
+thread	29
 	# number of threads
 
 
-email	shl198@eng.ucsd.edu
+email	shl198@eng.ucsd.edu 
 	# the email which start and stop messages will be sent to
  	# can help to measure how long the scripts take
-
+ 	# or phone number
 
 startMessage	start
 	# message which will be sent to email when pipeline starts
@@ -25,19 +25,22 @@ dataSource	ncbi
 	# can also be ensembl
 
 
-refSequence	/path/to/ref/fasta/file
+refSequence	/data/shangzhong/RibosomeProfiling/Database/combined.fa
 	# fasta file of target organism
 
 
-filePath	/path/to/fastq/files/folder
+filePath	/data/shangzhong/RibosomeProfiling/fq
 	# folder where fastq files locate
 
 
-alignerDb	/path/to/aligner/database
+alignerrRNADb	/data/shangzhong/RibosomeProfiling/Database/bowtie2_cho_rRNA/chorRNA
+	# rRNA alinger Db
+
+alignerDb	/data/shangzhong/RibosomeProfiling/Database/bowtie2_combineDb/combine
 	# index of refSequence for aligner to be used
 
 
-trim	False
+trim	True
 	# choose whether to trim the origional fastq files
 
 
@@ -55,24 +58,16 @@ trimmoAdapter
 	# trimmomatic adapter files
 
 
-aligner	/aligner/to/use
+aligner	bowtie2
 	# set aligner to run the pipeline, gsnap and start recomended
 
 
-annotation	/path/to/annotation/gff3/file
+annotation	/data/shangzhong/RibosomeProfiling/Database/combined.gff
 	# annotation file for organism
 
 
 htseqOutPath	/path/to/store/htseqCount/file
 	# pathway in which the htseq count files stores
-
-
-gsnapDbName	/db/name/for/gsnap
-	# If you use gsnap, you need to set this parameter
-
-
-gsnapAnnotation	/gsnap/annotation/file
-	# annotaton file for gsnap
 
 
 symbolIDFile	/path/to/files/stores/genesymbol/geneid/mapping
