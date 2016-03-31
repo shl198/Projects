@@ -7,13 +7,13 @@ Pipeline to preprocess fastq files to get the final bam file.
 
 Method to run the command:
  * define all parameters in 01_RiboPro_Parameters.txt
- * In the python file, change the folder in sys.path.append('/home/shangzhong/Codes/Pipeline') to your local Pipeline
+ * In the python file, change the folder in sys.path.append('/home/shangzhong/Codes/Pipeline') to your local Pipeline folder.
  * In terminal, run the following code:
  		nohup python 01_RibosomePipeline.py 01_RiboPro_Parameters.txt > log.txt &
 
- 02_RibosomeRecalibration.py
- ---------------------------
- Calculate distance between 5' end and A site in ribosome for each alignment length.
+02_RibosomeRecalibration.py
+---------------------------
+Calculate distance between 5' end and A site in ribosome for each alignment length.
 
 03_GeneralAnalysis.py
 ---------------------
