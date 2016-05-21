@@ -1514,8 +1514,24 @@ def get_genes_with_median_over0(covFiles):
 # ax.legend(lines,labels)
 # plt.savefig(fig_path+'/19_stall_frequency.svg')
 # # plt.show()
-
-
+#===============================================================================
+#                         19. Signal peptide abundance 
+#===============================================================================
+# # 1. get sp genes
+# sp_no_sp_gene_file = signalP_path + '/06_sp_no_sp_genes.txt'
+# df = pd.read_csv(sp_no_sp_gene_file,sep='\t',header=0)
+# sp_genes = list(set(df['gene_sp'].dropna().tolist()))
+# # 2. get rpkm for sp genes
+# rpkm_file = signalP_path + '/08_ribo_rna_rpkm_trans_eff.csv'
+# df = pd.read_csv(rpkm_file,sep='\t',header=0,index_col=0)
+# res_df = pd.DataFrame()
+# res_df['day3'] = df[['ribo_day3']].sort_values('ribo_day3',ascending=True).reset_index()[['ribo_day3']]
+# res_df['day6'] = df[['ribo_day6']].sort_values('ribo_day6',ascending=True).reset_index()[['ribo_day6']]
+# # res_df = np.log2(0.001 + res_df)
+# # 3. plot the fifigure
+# res_df.plot(alpha=0.5,color=['red','green'],title='signal peptide abundance distribution')
+# plt.savefig(fig_path + '/20_signal_peptides_abundance.png')
+# plt.show()
 
 
 

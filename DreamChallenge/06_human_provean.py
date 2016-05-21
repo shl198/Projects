@@ -121,7 +121,7 @@ out.close()
 
 
 #===============================================================================
-# plot correlation between cnv data and expression data
+#                 plot correlation between cnv data and expression data
 #===============================================================================
 # sample = '22RV1'
 # f1 = '/data/shangzhong/Dream/gex.csv'
@@ -148,32 +148,32 @@ out.close()
 #===============================================================================
 #             run codra
 #===============================================================================
-# import subprocess
-# path = '/data/shangzhong/Dream/CORDA'
-# os.chdir('/data/shangzhong/Dream/CORDA')
-# num = range(0,83,2)
-# num = num[:-1]
-# cmd = ''
-# for n in num:
-#     start=n+1
-#     if n ==80:
-#         end=83
-#     else:
-#         end = n+2
-#     cmd = cmd + ('matlab -r \"createDREAMmodels({start},{end})\" & ').format(start=start,end=end)
-# subprocess.call(cmd,shell=True)
-
-
-# # merge the results
+import subprocess
 path = '/data/shangzhong/Dream/CORDA'
-os.chdir(path)
-files = [f for f in os.listdir(path) if f.startswith('MetabolicCapabilities')]
-files = natsorted(files)
-res_df = pd.read_csv(files[0],header=0)
-for f in files[1:]:
-    df = pd.read_csv(f,header=0)
-    res_df = res_df + df
-res_df.to_csv(path + '/merge_metaCap.csv',index=False)
+os.chdir('/data/shangzhong/Dream/CORDA')
+num = range(72,83,2)
+num = num[:-1]
+cmd = ''
+for n in num:
+    start=n+1
+    if n ==80:
+        end=83
+    else:
+        end = n+2
+    cmd = cmd + ('matlab -r \"createDREAMmodels({start},{end})\" & ').format(start=start,end=end)
+subprocess.call(cmd,shell=True)
+
+
+# # # merge the results
+# path = '/data/shangzhong/Dream/CORDA'
+# os.chdir(path)
+# files = [f for f in os.listdir(path) if f.startswith('MetabolicCapabilities')]
+# files = natsorted(files)
+# res_df = pd.read_csv(files[0],header=0)
+# for f in files[1:]:
+#     df = pd.read_csv(f,header=0)
+#     res_df = res_df + df
+# res_df.to_csv(path + '/merge_metaCap.csv',index=False)
 
 
 
@@ -191,6 +191,27 @@ res_df.to_csv(path + '/merge_metaCap.csv',index=False)
 # 
 # res_df = cnv_df + mut_df
 # res_df.to_csv('/data/shangzhong/Dream/cnv_mut.csv')
+
+
+#===============================================================================
+#                     imputate the lipinski score
+#===============================================================================
+# fn = '/data/shangzhong/Dream/Drug_info_release.csv'
+# df = pd.read_csv(fn,header=0)
+# lipinski = []
+# for row in df.itertuples():
+#     res = 0
+#     if row[3] > 10: res = res + 1
+#     if row[4] > 5: res = res + 1
+#     if row[5] > 5: res = res + 1
+#     if row[-1] > 500: res = res + 1
+#     lipinski.append(res)
+# df['Lipinski'] = lipinski
+# df.to_csv('/data/shangzhong/Dream/Drug_info.csv',index=False)
+    
+
+
+
 
 
 

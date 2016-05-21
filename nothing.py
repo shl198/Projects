@@ -13,9 +13,6 @@ mpl.style.use('ggplot')
 import pysam
 from Bio.Seq import Seq
 
-
-
-
 #===============================================================================
 #      merge cufflink and htseq for pgsa
 #===============================================================================
@@ -63,59 +60,97 @@ from Bio.Seq import Seq
 # overlapped_region = merge_df[cri] 
 # print 'done'
 
+
+
+#===============================================================================
+#             get coverge plot for a single gene
+#===============================================================================
 def chunks(l, n):
     n = max(1, n)
     return [l[i:i + n] for i in range(0, len(l), n)]
+"""
+fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/04_gene_total_count/s05_cov_geneCount.txt'
+df = pd.read_csv(fn,sep='\t',header=0)
+df = df.sort(['count'])
+gene = df['GeneID'].tolist()
+gene.reverse()
+pr_fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/03_pr_pos_cov/s05_cov_prpos.txt'
+tr_fn = '/data/shangzhong/RibosomeProfiling/TotalRNA_align/03_tr_pos_cov/s02_cov_trpos.txt'
+handle1 = open(pr_fn,'r')
+handle2 = open(tr_fn,'r')
+g = gene[24]  # 7
+color = 'black'
+print g
+for line in handle1:
+    item = line[:-1].split('\t')
+    if item[0] == g:
+        cov = item[2:]
+        cov = [int(p) for p in cov]
+        cover = cov
+        n = 19#len(cover)
+        plt.figure()
+        plt.bar(range(n),cover[-19:],width=1.0,facecolor=color, edgecolor=color)
+        plt.ylim(0,1000)
+        plt.xlabel(g+'_pr')
+        break
+for line in handle2:
+    item = line[:-1].split('\t')
+    if item[0] == g:
+        cov = item[3:]
+        cov = [int(p) for p in cov]
+        cover=cov
+        cover = chunks(cov,3)
+        cover = [sum(p) for p in cover]
+        n = len(cover)
+        plt.figure()
+        plt.bar(range(312),cover[-312:],width=1.0,facecolor=color, edgecolor=color)
+        plt.ylim(0,450)
+        plt.xlabel(g+'_tr')
+        break
+plt.show()
+"""
 
-# fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/04_gene_total_count/s05_cov_geneCount.txt'
-# df = pd.read_csv(fn,sep='\t',header=0)
-# df = df.sort(['count'])
-# gene = df['GeneID'].tolist()
-# gene.reverse()
-# pr_fn = '/data/shangzhong/RibosomeProfiling/Ribo_align/bam/03_pr_pos_cov/s05_cov_prpos.txt'
-# tr_fn = '/data/shangzhong/RibosomeProfiling/TotalRNA_align/03_tr_pos_cov/s02_cov_trpos.txt'
-# handle1 = open(pr_fn,'r')
-# handle2 = open(tr_fn,'r')
-# g = gene[24]  # 7
-# color = 'black'
-# print g
-# for line in handle1:
-#     item = line[:-1].split('\t')
-#     if item[0] == g:
-#         cov = item[2:]
-#         cov = [int(p) for p in cov]
-#         cover = cov
-#         n = 19#len(cover)
-#         plt.figure()
-#         plt.bar(range(n),cover[-19:],width=1.0,facecolor=color, edgecolor=color)
-#         plt.ylim(0,1000)
-#         plt.xlabel(g+'_pr')
-#         break
-# for line in handle2:
-#     item = line[:-1].split('\t')
-#     if item[0] == g:
-#         cov = item[3:]
-#         cov = [int(p) for p in cov]
-#         cover=cov
-#         cover = chunks(cov,3)
-#         cover = [sum(p) for p in cover]
-#         n = len(cover)
-#         plt.figure()
-#         plt.bar(range(312),cover[-312:],width=1.0,facecolor=color, edgecolor=color)
-#         plt.ylim(0,450)
-#         plt.xlabel(g+'_tr')
-#         break        
-# plt.show()
-fn = '/home/shangzhong/pr_pos.txt'
-handle = open(fn,'r')
-for line in handle:
-    item = line.split(',')
-    print len(item)
-    cov = [int(p) for p in item]
-    plt.figure()
-    plt.bar(range(50),cov[:50],width=1.0,facecolor='black',edgecolor='black')
-    plt.ylim(0,60)
-    plt.show()
+# from Modules.f03_samtools import *
+# path = '/data/shangzhong/DetectVirus/Non_Autism'
+# os.chdir(path)
+# bamfiles = [f for f in os.listdir(path) if f.endswith('.bam')] 
+# merge_bam(bamfiles,'/data/shangzhong/DetectVirus/virus.bam')
+# import shutil
+# 
+# 
+
+
+# fn = '/data/shangzhong/Pacbio/fa/CHOS/CHOS_pacbio.fa'
+# length = []
+# for record in SeqIO.parse(open(fn,'r'),'fasta'):
+#     n = len(record.seq)
+#     length.append(n)
+# 
+# 
+# from collections import Counter
+# c = Counter(length)
+# print c
+# handle = open('/data/shangzhong/Pacbio/Results/01_reads_length.txt','w')
+# handle.write('length'+'\t'+ 'count'+'\n')
+# for key in c:
+#     handle.write(str(key)+'\t'+str(c[key])+'\n')
+
+
+
+
+            
+
+
+
+
+
+
+    
+
+
+
+
+
 
 
 

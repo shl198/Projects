@@ -16,7 +16,7 @@ from Modules.p01_FileProcess import remove,get_parameters,rg_bams
 from Modules.p02_ParseFasta import divide_scaffold_by_len
 #=============  define some parameters  ===================
 """these parameters and read group names are different for
-   different samples, should only change this part for 
+   different samples, should only change this part for
    running pipeline
 """
 

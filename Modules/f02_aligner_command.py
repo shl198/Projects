@@ -289,7 +289,8 @@ def STAR_Db(db_path,ref_fa,thread=1,annotation = '',genomeSize='large'):
             cmd = cmd + '--genomeChrBinNbits 6 --genomeSAindexNbases 4'
     print cmd
     subprocess.check_call(cmd,shell=True)
-    
+
+
 def STAR(fastqFiles,db_path,thread=1,annotation='',otherParameters=['']):
     """
     STAR are more proper for aligning RNA seq
@@ -376,8 +377,8 @@ def blasr(faFiles,ref_fa,thread=1,otherParameters=[]):
         else:
             out = fa[:-5]+'sam'
         outFiles.append(out)
-        cmd = cmd + ('blasr {input} {ref} -sam -out {out} -nproc {thread} '.format(
-                    input=fa,ref=ref_fa,out=out,thread=str(thread)))
+        cmd = cmd + ('blasr {input} {ref} -sam -out {out} -nproc {thread} ').format(
+                    input=fa,ref=ref_fa,out=out,thread=str(thread))
         if otherParameters != []:
             cmd = cmd + ' '.join(otherParameters)
         cmd = cmd + ' && '

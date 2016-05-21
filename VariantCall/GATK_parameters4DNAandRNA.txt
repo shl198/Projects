@@ -82,7 +82,7 @@ gatk	/home/shangzhong/Installation/GenomeAnalysisTK-3.3-0/GenomeAnalysisTK.jar
 
 
 readGroup	rg1,rg2,...
-	# format: @RG\\tID:CHI232L7\\tSM:I232\\tPL:illumina\\tLB:lib20000\\tPU:unit1
+	# format: @RG\\tID:CHI232L7\\tSM:I232
 	# a list of read groups for each single/(pair of) fastq(s)  
 	# each read group is a string
 	# There should be no space between comma and read group names

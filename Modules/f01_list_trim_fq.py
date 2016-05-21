@@ -3,6 +3,7 @@ from os import listdir
 import subprocess
 import copy
 from natsort import natsorted
+import gzip
 
 def chunk(l,n):
     n = max(1,n)
@@ -63,7 +64,34 @@ def list_files(file_path):
 
     return fastqFiles
 
-def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):  # batch means number of analysis run together in parallel in each batch
+
+
+def get_phred_score(fq):
+    """This function get phred score of fastq.gz file
+    """
+    score_found = False
+    with gzip.open(fq,'rb') as f:
+        n = 0
+        for line in f:
+            n = n + 1
+            line = line.rstrip()
+            if n%4 == 0:  # only get quality line
+                vals = [ord(c) for c in line]
+                lmin = min(vals);lmax=max(vals)
+                if lmin <= 50.:
+                    return '33'
+                    score_found=True
+                    break
+                if lmax >= 83.:
+                    score_found=True
+                    return '64'
+                    break
+    if score_found == False:
+        raise 'could not find the phred score, need to manually set'
+
+
+
+def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):
     """
     this function trims fastq files using Trimmomatic
     """
@@ -77,6 +105,7 @@ def Trimmomatic(Trimmomatic,fastqFiles,phred ='33',adapter_file='',batch=1):  # 
     for Fqs,Trims in zip(subFqs,subTrims):
         cmd = ''
         for fastq, trimFastq in zip(Fqs,Trims):
+            phred = get_phred_score(fastq[0])
             if len(fastq) ==2:
                 trimCmd1st = ('java -jar {Trim} PE -threads {thread} -phred{type} {fastq1} {fastq2} '
                 '{Trimmed1} unpair1.fq.gz {Trimmed2} unpair2.fq.gz ').format(Trim=Trimmomatic,

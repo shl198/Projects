@@ -21,6 +21,7 @@ def snpEff_annotateVCF(vcf,snpEff,genome):
     subprocess.call(cmd,shell=True)
     return output
 
+
 def snpSift_filterVCF(annotatedVCF,snpSift,filters=''):
     """
     This function filter the vcf inputwith snpSift

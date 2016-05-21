@@ -1,6 +1,7 @@
 """
 this file does variant calling for RNAseq
 """
+import pdb
 #=============  import required packages  =================
 import os
 import sys
@@ -21,6 +22,7 @@ from Modules.p01_FileProcess import remove,get_parameters,rg_bams
 """
 #parFile = '/data/shangzhong/DNArepair/RNA/GATK_parameters4DNAandRNA.txt'
 parFile = sys.argv[1]
+read_group = (sys.argv[2]).split(',')
 param = get_parameters(parFile)
 thread = param['thread']
 email = param['email']
@@ -37,15 +39,17 @@ picard = param['picard']
 trimmomatic = param['trimmomatic']
 trimmoAdapter = param['trimmoAdapter']
 gatk = param['gatk']
-read_group = param['readGroup']
+#read_group = param['readGroup']
 organism = param['organism']
+verbose = param['verbose']
 
 ##*****************  Part 0. Build index file for bwa and GATK ******
 ##*****************  Part I. Preprocess  ============================
 #========  1. map and dedupping =====================================
 #========  (0) enter the directory ========================
 os.chdir(file_path)
-Message(startMessage,email)
+if verbose == 'True':
+    Message(startMessage,email)
 #========  (1) read files  ================================
 fastqFiles = list_files(file_path)
 if trim == 'True':
@@ -80,7 +84,7 @@ except:
 #     Message('sort bam failed',email)
 #     raise
 try:
-    group_bams = addReadGroup(picard,map_sams,read_group,batch=9) 
+    group_bams = addReadGroup(picard,map_sams,read_group,batch=9)
     sys.stdout.write('add group succeed\n')
     sys.stdout.write('group_bams is: {group}\n'.format(group=group_bams))
 except:
@@ -217,5 +221,5 @@ except:
     sys.stdout.write('2 round gold vairant failed')
     Message('2 round gold variant failed',email)
     raise
-
-Message(endMessage,email)
+if verbose == 'True':
+    Message(endMessage,email)

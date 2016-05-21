@@ -16,8 +16,8 @@ from Modules.f12_trinity import Trinity
 from a01_blast2fasta import blast2fa,merge_fa
 from Modules.p04_ParseBlast import annotateBlast
 #=============  define some parameters  ===================
-parFile = sys.argv[1]
-#parFile = '/data/shangzhong/DetectVirus/Brain/01_DetectVirus_Parameters.txt'
+#parFile = sys.argv[1]
+parFile = '/data/shangzhong/DetectVirus/01_DetectVirus_Parameters.txt'
 param = get_parameters(parFile)
 thread = param['thread']
 email = param['email']
@@ -57,6 +57,7 @@ blast_nt_DB = param['blast_nt_DB']
 #========  (0) enter the directory ========================
 os.chdir(file_path)
 Message(startMessage,email)
+"""
 #========  (1) read files  ================================
 fastqFiles = list_files(file_path)
 if trim == 'True':
@@ -110,6 +111,8 @@ except:
     print 'unmap2host_fq_gzs failed'
     Message('unmap2host_fq_gzs failed',email)
     raise
+"""
+unmap2host_fq_gzs = [['sub1.fq.gz']]
 #===========================================================================
 #                 2. Map to virus reference genome
 #===========================================================================
@@ -122,17 +125,20 @@ try:
         # align the reads
         map_files = gsnap(unmap2host_fq_gzs,virus_alignerDb, virus_gsnapDbName,virus_gsnapAnnotation,thread)
     else:
-        map_files = STAR(unmap2host_fq_gzs,virus_alignerDb,thread)  # [file.sort.unmap2host.sam]
+        map_files = STAR(unmap2host_fq_gzs,virus_alignerDb,thread,'',['--outSAMunmapped Within'])  # [file.sam] 
+        new_map_files = [f[:-3]+'sort.unmap2host.sam' for f in map_files]
+        for f1,f2 in zip(map_files,new_map_files):
+            os.rename(f1,f2)                                        # [file.sort.unmap2host.sam]
     print 'virus align succeed'
-    print 'map_files is: ',map_files
-    remove(unmap2host_fq_gzs)
+    print 'map_files is: ',new_map_files
+#     remove(unmap2host_fq_gzs)
 except:
     print 'virus align failed'
     Message('virus align failed',email)
     raise
 #========  (2) sam to bam and sort  ================================
 try:
-    sorted_bams = sam2bam_sort(map_files,thread)    # [file.sort.unmap2host.sort.bam]
+    sorted_bams = sam2bam_sort(new_map_files,thread)    # [file.sort.bam] [file.sort.unmap2host.sort.bam]
     print 'virus sorted succeed'
     print 'sorted_bams is: ',sorted_bams
 except:
@@ -209,7 +215,7 @@ except:
 try:
     Trinity(mergedFa,thread)
     print 'assemble using Trinity succeed'
-    remove(mergedFa)
+#     remove(mergedFa)
 except:
     print 'assemble using Trinity failed'
     Message('assemble using Trinity failed',email)

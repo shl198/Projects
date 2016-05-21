@@ -9,13 +9,14 @@ sys.path.append('/home/shangzhong/Codes/Pipeline')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from Modules.f00_Message import Message
 from Modules.f01_list_trim_fq import list_files,Trimmomatic
-from Modules.f02_aligner_command import gsnap,STAR,STAR_Db
+from Modules.f02_aligner_command import gsnap,STAR,STAR_Db,bowtie
 from Modules.f03_samtools import sam2bam_sort,flagstat
 from Modules.f04_htseq import htseq_count
 from Modules.f05_IDConvert import geneSymbol2EntrezID
 from Modules.p01_FileProcess import get_parameters
+from Modules.p01_FileProcess import remove
 #=========== define some parameters ===================
-#parFile = '/data/shangzhong/DE/FDA/Database/01_DE_Parameters.txt'
+#parFile = '/data/shangzhong/DE/FDA/01_DE_Parameters.txt'
 parFile = sys.argv[1]
 param = get_parameters(parFile)
 
@@ -36,6 +37,7 @@ trimmoAdapter = param['trimmoAdapter']
 aligner = param['aligner']
 annotation = param['annotation']
 output_path = param['htseqOutPath']
+htseqBatch = param['htseqBatch']
 db_name = param['gsnapDbName']
 gsnap_annotation = param['gsnapAnnotation']
 
@@ -43,29 +45,35 @@ Dict = param['symbolIDFile']
 inputpath = file_path
 
 #=========== (0) enter the directory ================
-Message(startMessage,email)
 os.chdir(file_path)
+Message(startMessage,email)
 #=========== (1) reads files and trim ===============
+
 fastqFiles = list_files(file_path)
 print 'list file succeed'
 if trim == 'True':
     try:
-        fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter,batch=6)
+        trim_fastqFiles = Trimmomatic(trimmomatic,fastqFiles,phred,trimmoAdapter,batch=6)
         print 'trim succeed'
         print 'fastqFiles is: ',fastqFiles
+        remove(fastqFiles)
     except:
         print 'trim failed'
         Message('trim failed',email)
         raise
+else:
+    trim_fastqFiles = fastqFiles
 #=========== (2) run STAR to do the mapping ========
 try:
     if aligner == 'gsnap':
-        map_files = gsnap(fastqFiles,db_path, db_name,gsnap_annotation,thread)
-    else:
+        map_files = gsnap(trim_fastqFiles,db_path, db_name,gsnap_annotation,thread)
+    elif aligner == 'STAR':
         if not os.path.exists(db_path): os.mkdir(db_path)
         if os.listdir(db_path) == []:
             STAR_Db(db_path,ref_fa,thread)
-        map_files = STAR(fastqFiles,db_path,thread,annotation,['--outSAMtype BAM SortedByCoordinate','--quantMode GeneCounts'])
+        map_files = STAR(trim_fastqFiles,db_path,thread,annotation,['--outSAMtype BAM SortedByCoordinate','--quantMode GeneCounts'])
+    elif aligner == 'bowtie':
+        map_files = bowtie(trim_fastqFiles,db_path,thread=1,otherParameters=[''])
     print 'align succeed'
     print 'map_files is: ',map_files
 except:
@@ -91,7 +99,7 @@ except:
     raise
 #=========== (4) htseq_count ========================
 try:
-    htseq_count(sorted_bams,annotation,output_path,dataSource)
+    htseq_count(sorted_bams,annotation,output_path,dataSource,htseqBatch)
     print 'htseq count succeed'
 except:
     print 'htseq count failed'

@@ -101,6 +101,7 @@ def blast2faSingle(blastResultFiles,OriginFaFiles):
     
     * blastResultFiles: list.  a list of blast tab demilited (format 7) files. eg: ['f1.txt','f2.txt',...]
     * OriginFaFiles:    list.  a list of fasta files that are queiries when doing blast. eg: ['f1.fa','f2.fa',...]
+    return a fasta file for reads in balst results
     """
     # loop for each blast and origin
     res = []
@@ -172,6 +173,7 @@ def merge_fa(seqType,*files):
     for i in range(len(final_list)):
         if final_list[i].endswith('.gz'):
             cmd = ('gunzip {f}').format(f=final_list[i])
+            print cmd
             subprocess.call(cmd.split(' '))
             final_list[i] = final_list[i][:-3]
     # deal with the single end samples
@@ -179,6 +181,7 @@ def merge_fa(seqType,*files):
         outFile = 'merged4Trinity.fa'
         res.append(outFile)
         cmd = ('cat {f_list} > {out}').format(f_list=' '.join(final_list),out=outFile)
+        print cmd
         subprocess.call(cmd,shell=True)
     # deal with paired end samples
     if seqType == 'pair':
@@ -186,9 +189,11 @@ def merge_fa(seqType,*files):
         right = [f for f in final_list if '_2.' in f]
         outFile1 = 'merged4Trinity1.fa'
         cmd = ('cat {f_list} > {out}').format(f_list=' '.join(left),out=outFile1)
+        print cmd
         subprocess.call(cmd,shell=True)
         outFile2 = 'merged4Trinity2.fa'
         cmd = ('cat {f_list} > {out}').format(f_list=' '.join(right),out=outFile2)
+        print cmd
         subprocess.call(cmd,shell=True)
         res = [outFile1,outFile2]
     return res

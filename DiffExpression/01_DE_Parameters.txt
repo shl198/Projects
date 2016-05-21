@@ -67,6 +67,10 @@ htseqOutPath	/path/to/store/htseqCount/file
 	# pathway in which the htseq count files stores
 
 
+htseqBatch	int
+	# how many bam files run in parallel each time
+	
+
 gsnapDbName	/db/name/for/gsnap
 	# If you use gsnap, you need to set this parameter
 

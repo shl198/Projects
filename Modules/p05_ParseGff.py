@@ -1,6 +1,8 @@
 import subprocess,os
 from Bio import SeqIO,Seq
 import pandas as pd
+import re
+
 def extract_geneID(outputFile,gff3):
     """
     This function extracts gene ids from gff3 annotation file
@@ -464,10 +466,10 @@ def get_diff_pr_from_refseq(outputFile,ref_fa,ref_gff3,gene_list_file=''):
             print 'fail to get AA and compare'
             raise
 
-# outputFile = '/data/shangzhong/DNArepair/hamster_pr_different_from_refseq.fa'
+# outputFile = '/data/shangzhong/DNArepair/f04_new_annotation/new_repair_diff_from_refseq.fa'
 # genelist = '/data/shangzhong/DNArepair/Database/03_DNA_repair_genes.hamster.txt'
 # get_diff_pr_from_refseq(outputFile,#'/opt/genome/cho/chok1.fa','/opt/genome/cho/chok1.gff3')
-#                          '/data/shangzhong/DNArepair/Database/hamster.fa',
+#                          '/data/genome/hamster/ncbi_refseq_masked_repair_genes/hamster.masked_discrepancies.repair_refseq.fa',
 #                          '/data/shangzhong/DNArepair/Database/hamster.gff',genelist)
 
 # outputFile = '/data/shangzhong/VariantCall/Hamster/hamster_pr_different_from_refseq.fa'
@@ -477,3 +479,21 @@ def get_diff_pr_from_refseq(outputFile,ref_fa,ref_gff3,gene_list_file=''):
 #                          '/opt/genome/hamster/hamster.gff3',genelist)
 # print 'job done'
 
+def ercc_gtf2gff(gtf):
+    """change ercc gtf file to gff file"""
+    gff = gtf[:-3]+'more.gff'
+    gtf_h = open(gtf)
+    gff_h = open(gff,'w')
+    for line in gtf_h:
+        item = line.strip().split('\t')
+        gene_id = re.search('(?<=gene_id\s\").+?(?=\";)',item[8]).group()
+        tr_id = re.search('(?<=transcript_id\s\").+?(?=\";)',item[8]).group()
+        # write gene line
+        item[2] = 'gene'
+        item[8] = 'ID=gene'+gene_id
+        gff_h.write('\t'.join(item)+'\n')
+        #write exon line
+        item[2] = 'exon'
+        item[8] = ('ID=exon{g};gene={g};Parent=gene{g};transcript_id={trid}').format(g=gene_id,trid=tr_id)
+        gff_h.write('\t'.join(item)+'\n')
+    gff_h.close()

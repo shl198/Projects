@@ -58,7 +58,7 @@ def addReadGroup(picard,sortBamFiles,readgroups,batch=1):
             sortBams.append(sortbam)
             readgroup = rg.split('\\t')
             ID = readgroup[1][3:-1]
-            SM = readgroup[2][3:-1]
+            SM = readgroup[2][3:]
             PL = 'illumina' #readgroup[3][3:-1]
             LB = 'lib20000' #readgroup[4][3:-1]
             PU = 'unit1' #readgroup[5][3:]

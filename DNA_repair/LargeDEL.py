@@ -4,7 +4,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from rosetta.parallel.pandas_easy import groupby_to_series_to_frame
 from joblib import Parallel,delayed
-import multiprocessing
+import multiprocessing,re
 #===============================================================================
 #                     1. Merge scaffolds
 #===============================================================================
@@ -106,7 +106,7 @@ def applyParallel(dfGrouped,func,thread):
 
 
 # del_threshold = 500
-# blast = '/data/shangzhong/LargeDeletion/03_cho_blast_low_sensitivity28_filter.txt'
+# blast = '/data/shangzhong/LargeDeletion/05_del_blast2_hamster.txt'
 # blst_df = pd.read_csv(blast,sep='\t',header=None,names=['qid','chr','iden','len',
 #                     'mis','gap','qstart','qend','sstart','send','evalue','bit'])
 # blst_df['keep'] = pd.Series(['T']*blst_df.shape[0])
@@ -120,9 +120,77 @@ def applyParallel(dfGrouped,func,thread):
 #===============================================================================
 #                     4. get overlap between deletion and genes
 #===============================================================================
+def gene_del_overlap(line,del_df):
+    """check gff gene line overlap with deletion
+    """
+    g_start = line['start']
+    g_end = line['end']
+    chrom = line['chr']
+    # only keep deletions in the same chromosome
+    chr_del_df = del_df[del_df['chr'].values==chrom]
+    chr_del_df['overlap'] = chr_del_df.apply(lambda x: set(range(min(x['sstart'],x['send']),max(x['sstart'],x['send'])+1)).intersection(range(g_start,g_end+1)),axis=1)
+    overlap_df = chr_del_df[chr_del_df['overlap'].values!=set()]
+    overlap_del = list(set(overlap_df['qid'].tolist()))
+    line['del'] = ','.join(overlap_del)
+    overlap_l = overlap_df['overlap'].tolist()  # overlap list
+    if overlap_l == []: 
+        line['del_start'] = line['del_end'] = 0
+    else:
+        del_s = []; del_e = []
+        for over in overlap_l:
+            del_s.append(min(list(over)))
+            del_e.append(max(list(over)))
+        del_s = [str(i) for i in del_s]
+        del_e = [str(i) for i in del_e]
+        line['del_start'] = ','.join(del_s)
+        line['del_end'] = ','.join(del_e)
+    return line
+    
+def get_del_len(row):
+    start = row['del_start'].split(',')
+    end = row['del_end'].split(',')
+    pos = []
+    for m,n in zip(start,end):
+        pos.extend(range(m,n+1))
+    length = len(list(set(pos)))
+    return length
+    
+    
+blast = '/data/shangzhong/LargeDeletion/05_del_blast2_hamster_rm_overlap.txt'
+blst_df = pd.read_csv(blast,sep='\t',header=None,names=['qid','chr','iden','len',
+                    'mis','gap','qstart','qend','sstart','send','evalue','bit'])
+# filter blast results
+blst_df = blst_df[~((blst_df['iden']<90.00) & (blst_df['len']<200))]
+
+del_chrs = blst_df['chr'].tolist()  # deletion mapped chromosomes
+
+# read gff file and only keep annotation on the deletion mapping chromosomes
+gff = '/data/genome/hamster/ncbi_refseq/hamster.gff'
+gff_df = pd.read_csv(gff,sep='\t',header=None,comment='#',names=['chr','s','feature','start','end','dot','strand','none','anno'])
+gff_df = gff_df.drop(['s','dot','none'],axis=1)
+gff_df = gff_df[gff_df['chr'].isin(del_chrs)]
+# only keep annotation lines that have gene= in description column
+cri = gff_df['anno'].apply(lambda x: 'gene=' in x)
+gff_df = gff_df[cri]
+gff_df = gff_df.reset_index(drop=True)
+# add geneid and gene symbol to dataframe and only extract line whose feature is gene
+gff_df['gene'] = gff_df['anno'].apply(lambda x: re.search('(?<=gene=).+?(?=;|$)',x).group())
+gff_df['geneid'] = gff_df['anno'].apply(lambda x: re.search('(?<=GeneID:).+?(?=[;,]|$)',x).group())
+gff_df['gene_len'] = gff_df['end'] - gff_df['start'] + 1
+gene_df = gff_df[gff_df['feature'].values=='gene'].copy()
+gene_df = gene_df.drop(['anno'],1)
+gene_df = gene_df.reset_index(drop=True)
+# add del_start, del_end column to gene_df
+row_num = gene_df.shape[0]
+gene_df = gene_df.reindex(columns=gene_df.columns.tolist() + ['del_start','del_end','del'],fill_value=0)
+ 
 
 
-
+### get gene deletion start and end
+res = gene_df.apply(lambda row: gene_del_overlap(row,blst_df),axis=1)
+res_df = res[res['del_start'].values!=0]
+res_df['del_len'] = res_df.apply(lambda row: get_del_len(row),axis=1)
+res_df['del_percent'] = res_df['del_len'].div(res_df['gene_len'])
 
 
 

@@ -815,6 +815,7 @@ class trpr(object):
     def __init__(self,df):
         self.df = df
         self.df.columns = ['chr','start','end','geneid','access','strand']
+        self.df['geneid'] = self.df['geneid'].astype(str)
     # id part
     def get_chrom(self,g,id_type='gene'):
         """
