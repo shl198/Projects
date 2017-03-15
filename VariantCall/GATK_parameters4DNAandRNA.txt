@@ -3,11 +3,11 @@
 # name_1.fq.gz, name_2.fq.gz or name_1.fastq.gz, name_2.fastq.gz
 
 ##===============  global parameters ================================
-thread	1
+thread	16
 	# number of threads
 
 
-email	username@ucsd.edu
+email	7144961661@txt.att.net
 	# the email which start and stop messages will be sent to
  	# can help to measure how long the scripts take
 
@@ -20,28 +20,29 @@ endMessage	end
 	# message which will be sent to email when pipeline finishes
 
 
-refSequence	/path/fasta.fa
+refSequence	/data/genome/hamster/ncbi_refseq_masked_repair_genes/hamster.masked_discrepancies.repair_refseq.fa
 	# fasta file of target organism
 
 
-filePath	/path/to/fastqFiles/
+filePath	/data/hooman/DNARepair/fq
 	# folder where fastq files locate
 
 
-alignerDb	/path/to/alignerIndex
+alignerDb	/data/genome/hamster/ncbi_refseq_masked_repair_genes/hamster_masked_repair_STAR_db
 	# index of refSequence for aligner to be used
 
 
-trim	False
+trim	True
+	# Alter: False
 	# choose whether to trim the origional fastq files
 
 
 phred	33
-	# encoding  phred score for raw data. Determined based on fastqc results.
-	# other option: 64 if encoding version is less than 1.8.
+	# encoding phred score for raw data. Determined based on fastqc results
+	# other option: 64 if fastq encoding version is less than 1.8.
 
 
-picard	/home/shangzhong/Installation/picard-tools-1.121
+picard	/home/shangzhong/Installation/picard-tools-1.141/picard.jar
 	# picard folder pathway
 
 
@@ -52,37 +53,24 @@ trimmomatic	/home/shangzhong/Installation/Trimmomatic-0.32/trimmomatic-0.32.jar
 trimmoAdapter	
 	# trimmomatic adapter files
 
+verbose	False
+	# send start/stop message, set false if calling as part of wrapper
 
-dbSNP	/data/shangzhong/VariantCall/Human_Test/DataBase/dbsnp_138.b37.vcf
-	# gold standard snps
-
-
-phase1INDEL	/data/shangzhong/VariantCall/Human_Test/DataBase/1000G_phase1.indels.b37.vcf
-	# gold standard indels for local realignment
-
-
-MillINDEL	/data/shangzhong/VariantCall/Human_Test/DataBase/Mills_and_1000G_gold_standard.indels.b37.vcf
-	# gold standard indel for local realignment
-
-
-omni	/data/shangzhong/VariantCall/Human_Test/DataBase/1000G_omni2.5.b37.vcf
-	# true sites training sources.
-
-
-hapMap	/data/shangzhong/VariantCall/Human_Test/DataBase/hapmap_3.3.b37.vcf
-	# true sites training sources.
+STARlong	True
+	# True: run STARlong, False: run STAR.
 ##================ parameters for specific pipeline ==================
 #----------------- GATK pipeline -------------------------------------
 # 1. check whether dict and index file for reference fa exist, if not, 
 # use CreateSequenceDictionary from picard tool to generate dict
 # use samtools faidx to generate fai file
 
-gatk	/home/shangzhong/Installation/GenomeAnalysisTK-3.3-0/GenomeAnalysisTK.jar
+gatk	/home/shangzhong/Installation/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar
 	# pathway to gatk
 
 
-readGroup	rg1,rg2,...
-	# format: @RG\\tID:CHI232L7\\tSM:I232
+readGroup	@RG\\tID:P101\\tSM:P101,@RG\\tID:P102\\tSM:P102,@RG\\tID:P103\\tSM:P103,@RG\\tID:P104\\tSM:P104
+	#rg1,rg2,...
+	# format: @RG\\tID:CHI232L7\\tSM:I232\\tPL:illumina\\tLB:lib20000\\tPU:unit1
 	# a list of read groups for each single/(pair of) fastq(s)  
 	# each read group is a string
 	# There should be no space between comma and read group names
@@ -90,6 +78,6 @@ readGroup	rg1,rg2,...
 	
 	
 
-organism	Human
+organism	Hamster
 	# name for the target organism
 

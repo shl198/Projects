@@ -20,9 +20,9 @@ from Modules.p01_FileProcess import remove,get_parameters,rg_bams
    different samples, should only change this part for 
    running pipeline
 """
-# parFile = '/data/hooman/DNARepair/GATK_parameters4DNAandRNA.txt'
+#parFile = '/data/shangzhong/Proteogenomics/GATK_parameters4DNAandRNA.txt'
 parFile = sys.argv[1]
-read_group = (sys.argv[2]).split(',')
+#read_group = (sys.argv[2]).split(',')
 param = get_parameters(parFile)
 thread = param['thread']
 email = param['email']
@@ -39,12 +39,10 @@ picard = param['picard']
 trimmomatic = param['trimmomatic']
 trimmoAdapter = param['trimmoAdapter']
 gatk = param['gatk']
-#read_group = param['readGroup']
+read_group = param['readGroup']
 organism = param['organism']
-verbose = param['verbose']
-starlong = param['STARlong']
+verbose = 'True'
 
-# read_group = param['readGroup']
 ##*****************  Part 0. Build index file for bwa and GATK ******
 ##*****************  Part I. Preprocess  ============================
 #========  1. map and dedupping =====================================
@@ -67,7 +65,7 @@ try:
     if not os.path.exists(starDb): os.mkdir(starDb)
     if os.listdir(starDb) == []:
         STAR_Db(starDb,ref_fa,thread)
-    map_sams= STAR2Pass(trim_fastqFiles,starDb,ref_fa,thread,starlong)
+    map_sams= STAR2Pass(trim_fastqFiles,starDb,ref_fa,thread)
     sys.stdout.write('align succeed\n')
     sys.stdout.write('map_sams is: {map}\n'.format(map=map_sams))
 except:
@@ -133,6 +131,7 @@ except:
     sys.stdout.write('IndelRealigner failed\n')
     Message('IndelRealigner failed',email)
     raise
+
 #========  5. Base quality recalibration  =================
 
 # since we don't have dbsnp for CHO, we need to:
