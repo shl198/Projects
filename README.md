@@ -1,7 +1,7 @@
-Pipeline_Project
+Project
 ================
 
-Scripts for all kinds of pipeline mainly for CHO
+Scripts for all projects and some pipeline mainly for CHO
 
 Modules:
 --------
