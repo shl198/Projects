@@ -74,4 +74,62 @@ def IndelAnalysis(vcf,snpEff,snpSift,genome,geneFile):
 # geneFile = '/data/shangzhong/VariantCall/GlycoKO/gs_genes.txt'
 # IndelAnalysis(vcf,snpEff,snpSift,genome,geneFile)
 
+from pybedtools import BedTool as bedtool
+import pandas as pd
+import re
+import numpy as np
+
+class sv_vcf(object):
+    '''Input is vcf dataframe'''
+    def __init__(self,df):
+        self.df = df
+        self.columns = ['CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT','Var']
+        
+    def get_sv_type(self):
+        df = self.df
+        return list(set(df['ALT'].tolist()))
+    
+    def get_sv_num(self,sv_type):
+        '''get sv number'''
+        df = self.df
+        return df[df['annot'].values==sv_type].shape[0]
+    
+    @staticmethod
+    def get_sv_len(info,feature):
+        '''extract end position in vcf file.
+        * feature: be SVLEN=, or END='''
+        try:
+            length = abs(int(re.search('(?<=;{f}).+?(?=;)'.format(f=feature),info).group(0)))
+        except:
+            length = None
+        return length
+        
+    def add_sv_len(self):
+        '''add sv length for each sv except translocation whose break points are in different chromosome.'''
+        df = self.df
+        df['sv_len'] = df.apply(lambda row: sv_vcf.get_sv_len(row['INFO'],'SVLEN='),axis=1)
+        self.df = df
+        #return df
+
+    def add_sv_end(self):
+        '''get end position of the sv'''
+        df = self.df
+        df['end'] = df.apply(lambda row: sv_vcf.get_sv_len(row['INFO'],'END='),axis=1)
+        self.df = df
+        
+    def get_sv_num4_each_chr(self,chr_len_df,sv_type,count_log=False,length_log=False):
+        '''get sv number for each scaffold for specific sv type
+        * chr_len_df: pandas dataframe with 1 column. ['chr_len']. chr name is index
+        '''
+        df = self.df[self.df['annot'].values==sv_type]
+        sv_count = df.groupby(['uRef']).size()
+        df = pd.concat([sv_count,chr_len_df],axis=1)
+        df = df.fillna(0)
+        df = df.rename(columns={0:'count'})
+        if count_log == True:
+            df['count'] = np.log10(df['count'])
+        if length_log == True:
+            df['chr_len'] = np.log10(df['chr_len'])
+        return df
+
 
