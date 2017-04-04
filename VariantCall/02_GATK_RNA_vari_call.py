@@ -6,7 +6,7 @@ import pdb
 import os
 import sys
 import subprocess
-sys.path.append('/home/shangzhong/Codes/Pipeline')
+sys.path.append('/home/shangzhong/Codes/Projects')
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # disable buffer
 from Modules.f00_Message import Message
 from Modules.f01_list_trim_fq import list_files,Trimmomatic
