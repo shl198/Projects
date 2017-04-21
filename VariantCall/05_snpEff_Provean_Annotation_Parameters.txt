@@ -1,55 +1,59 @@
 # This file has all parameters that variant annotation and provean score calculation.
 
 ##=============== Parameters ==========
-thread	1
+thread	6
 	# number of threads
 
 
-email	username@ucsd.edu
+pathway	/data/hooman/LdhaCombiClones/vcf
+	# pathway of files
+
+
+protein_path	/data/hooman/LdhaCombiClones/AA
+
+
+email	8582636967@txt.att.net
 	# the email which start and stop messages will be sent to
  	# can help to measure how long the scripts take
 
 
-startMessage	start
+startMessage	annotation start
 	# message which will be sent to email when pipeline starts
 
 
-endMessage	end
+endMessage	annotation end
 	# message which will be sent to email when pipeline finishes
 
 
-reference	/path/fasta.fa
+reference	/data/genome/cho/ercc_cho/chok1_ercc.fa
 	# the reference genome
 
 
-annotation	/path/gff3
+annotation	/data/genome/cho/ercc_cho/chok1_ercc.gff
 	# annotation file.
 
 
-CodonFile	/DNA/codon/file
-	# 1st column is codon,2nd is amino acid
+genome	chok1ercc
+	# must be same as in the snpeff configure file
 
 
-snpSift	/path/snpSift.jar
+snpSift	/data/shangzhong/VariantCall/snpEff/SnpSift.jar
 	# snpSift
 
 
-snpEff /path/snpEff.jar
+snpEff	/data/shangzhong/VariantCall/snpEff/snpEff.jar
 	# snpEff
 
 
-genome	genome name
-	# must be same as in the snpeff configure file
-	# eg: in file it shows 'chok1201405.genome : CHOk1', the name should be chok1201405
-
-
-provean	/path/provean.sh
+provean	/home/shangzhong/Installation/provean-1.1.5/bin/provean.sh
 	# provean
 
 
-support_set	/path/to/support/set
-	# support set for provean
+support_set	/data/shangzhong/DNArepair/Annotation/hamster_provean_support_set
+	# pathway to store the provean support set, this can save time after the first run
 
+
+provean_results	/data/hooman/LdhaCombiClones/Provean_results
 ##========= target genes ===============
-gene_file	/path/to/gene_list.txt
-	# a file list of all interested gene symbols
+gene_file	/data/hooman/LdhaCombiClones/gene_list.txt
+	# a file list of all interested gene symbols DNA_repair_genes.txt
